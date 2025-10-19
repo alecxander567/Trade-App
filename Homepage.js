@@ -106,7 +106,7 @@ export default function Homepage() {
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Navbar */}
+            <View style={styles.appWrapper}>
             <View style={styles.navbar}>
                 <Text style={styles.navTitle}>Home</Text>
 
@@ -143,7 +143,7 @@ export default function Homepage() {
                 </View>
             </View>
 
-            <ScrollView style={{ flex: 1, paddingHorizontal: 20, marginTop: 10, paddingBottom: 100 }}>
+                <ScrollView style={styles.scrollView}>
                 {items.length === 0 ? (
                     <Text style={{ color: '#aaa', textAlign: 'center', marginTop: 20 }}>
                         No items found.
@@ -279,6 +279,7 @@ export default function Homepage() {
                     <Ionicons name="add" size={32} color="#fff" />
                 </TouchableOpacity>
             </View>
+            </View>
 
 
             {/* Modal */}
@@ -363,6 +364,24 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#0B0B1D',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    appWrapper: {
+        width: 360,
+        flex: 1,
+        maxHeight: 740,
+        backgroundColor: '#0B0B1D',
+        borderRadius: 10,
+        overflow: 'hidden',
+        flexDirection: 'column',
+    },
+    scrollView: {
+        flex: 1,
+        width: '100%',
+        paddingHorizontal: 20,
+        paddingBottom: 10,
+        marginBottom: 15,
     },
     content: {
         flex: 1,
@@ -412,8 +431,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         position: 'absolute',
-        left: '55%',
-        marginLeft: -30,
+        bottom: 20,
+        left: 150,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
@@ -430,6 +449,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         borderBottomWidth: 1,
         borderBottomColor: '#2E2E50',
+        paddingTop: 10
     },
     navTitle: {
         color: '#fff',

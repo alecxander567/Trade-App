@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, StatusBar, Modal, TextInput, Platform, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, StatusBar, Modal, TextInput, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -68,9 +68,12 @@ export default function Landingpage() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView style={styles.scrollView}>
-                <StatusBar barStyle="light-content" />
-
+            <StatusBar barStyle="light-content" />
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
                 {/* Navbar */}
                 <View style={styles.navbar}>
                     <Text style={styles.navTitle}>TradeSmart</Text>
@@ -118,88 +121,149 @@ export default function Landingpage() {
                 <View style={styles.footer}>
                     <Text style={styles.footerText}>© 2025 TradeSmart. All rights reserved.</Text>
                 </View>
+            </ScrollView>
 
-                {/* Sign Up Modal */}
-                <Modal
-                    animationType="slide"
-                    transparent={true}
-                    visible={signUpModalVisible}
-                    onRequestClose={() => setSignUpModalVisible(false)}
+            {/* Sign Up Modal */}
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={signUpModalVisible}
+                onRequestClose={() => setSignUpModalVisible(false)}
+            >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
                 >
-                    <View style={styles.modalOverlay}>
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>Sign Up</Text>
-                            <TextInput placeholder="Username" style={styles.input} value={username} onChangeText={setUsername} placeholderTextColor="#CFCFCF" />
-                            <TextInput placeholder="Email" style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" placeholderTextColor="#CFCFCF" />
-                            <TextInput placeholder="Password" style={styles.input} value={password} onChangeText={setPassword} secureTextEntry placeholderTextColor="#CFCFCF" />
-                            <TouchableOpacity style={styles.modalButton} onPress={handleSignUp}>
-                                <Text style={styles.modalButtonText}>Register</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setSignUpModalVisible(false)}>
-                                <Text style={styles.modalCloseButtonText}>Cancel</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </Modal>
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        style={styles.modalOverlay}
+                        onPress={() => setSignUpModalVisible(false)}
+                    >
+                        <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+                            <View style={styles.modalContent}>
+                                <Text style={styles.modalTitle}>Sign Up</Text>
 
-                <Modal
-                    animationType="slide"
-                    transparent={true}
-                    visible={loginModalVisible}
-                    onRequestClose={() => setLoginModalVisible(false)}
-                >
-                    <View style={styles.modalOverlay}>
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>Login</Text>
-
-                            {/* Email Input */}
-                            <TextInput
-                                placeholder="Email"
-                                style={styles.input}
-                                value={email}
-                                onChangeText={setEmail}
-                                keyboardType="email-address"
-                                placeholderTextColor="#CFCFCF"
-                            />
-
-                            {/* Password Input with same style as Email and fixed padding */}
-                            <View style={{ position: 'relative', marginBottom: 12 }}>
                                 <TextInput
-                                    placeholder="Password"
-                                    style={[styles.input, { paddingVertical: 12, paddingRight: 40 }]} // added right padding for icon
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    secureTextEntry={hidePassword}
+                                    placeholder="Username"
+                                    style={styles.input}
+                                    value={username}
+                                    onChangeText={setUsername}
                                     placeholderTextColor="#CFCFCF"
                                 />
-                                <TouchableOpacity
-                                    onPress={() => setHidePassword(!hidePassword)}
-                                    style={{ position: 'absolute', right: 12, top: '15%' }} // vertical alignment
-                                >
-                                    <Ionicons
-                                        name={hidePassword ? "eye-off-outline" : "eye-outline"}
-                                        size={24}
-                                        color="#CFCFCF"
+
+                                <TextInput
+                                    placeholder="Email"
+                                    style={styles.input}
+                                    value={email}
+                                    onChangeText={setEmail}
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                    placeholderTextColor="#CFCFCF"
+                                />
+
+                                <View style={styles.passwordContainer}>
+                                    <TextInput
+                                        placeholder="Password"
+                                        style={[styles.input, styles.passwordInput]}
+                                        value={password}
+                                        onChangeText={setPassword}
+                                        secureTextEntry={hidePassword}
+                                        placeholderTextColor="#CFCFCF"
                                     />
+                                    <TouchableOpacity
+                                        onPress={() => setHidePassword(!hidePassword)}
+                                        style={styles.eyeIcon}
+                                    >
+                                        <Ionicons
+                                            name={hidePassword ? "eye-off-outline" : "eye-outline"}
+                                            size={24}
+                                            color="#CFCFCF"
+                                        />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <TouchableOpacity style={styles.modalButton} onPress={handleSignUp}>
+                                    <Text style={styles.modalButtonText}>Register</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.modalCloseButton}
+                                    onPress={() => setSignUpModalVisible(false)}
+                                >
+                                    <Text style={styles.modalCloseButtonText}>Cancel</Text>
                                 </TouchableOpacity>
                             </View>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </KeyboardAvoidingView>
+            </Modal>
 
-                            {/* Login Button */}
-                            <TouchableOpacity style={styles.modalButton} onPress={handleLogin}>
-                                <Text style={styles.modalButtonText}>Login</Text>
-                            </TouchableOpacity>
+            {/* Login Modal */}
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={loginModalVisible}
+                onRequestClose={() => setLoginModalVisible(false)}
+            >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        style={styles.modalOverlay}
+                        onPress={() => setLoginModalVisible(false)}
+                    >
+                        <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+                            <View style={styles.modalContent}>
+                                <Text style={styles.modalTitle}>Login</Text>
 
-                            {/* Cancel Button */}
-                            <TouchableOpacity
-                                style={styles.modalCloseButton}
-                                onPress={() => setLoginModalVisible(false)}
-                            >
-                                <Text style={styles.modalCloseButtonText}>Cancel</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </Modal>
-            </ScrollView>
+                                <TextInput
+                                    placeholder="Email"
+                                    style={styles.input}
+                                    value={email}
+                                    onChangeText={setEmail}
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                    placeholderTextColor="#CFCFCF"
+                                />
+
+                                <View style={styles.passwordContainer}>
+                                    <TextInput
+                                        placeholder="Password"
+                                        style={[styles.input, styles.passwordInput]}
+                                        value={password}
+                                        onChangeText={setPassword}
+                                        secureTextEntry={hidePassword}
+                                        placeholderTextColor="#CFCFCF"
+                                    />
+                                    <TouchableOpacity
+                                        onPress={() => setHidePassword(!hidePassword)}
+                                        style={styles.eyeIcon}
+                                    >
+                                        <Ionicons
+                                            name={hidePassword ? "eye-off-outline" : "eye-outline"}
+                                            size={24}
+                                            color="#CFCFCF"
+                                        />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <TouchableOpacity style={styles.modalButton} onPress={handleLogin}>
+                                    <Text style={styles.modalButtonText}>Login</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.modalCloseButton}
+                                    onPress={() => setLoginModalVisible(false)}
+                                >
+                                    <Text style={styles.modalCloseButtonText}>Cancel</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </KeyboardAvoidingView>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -212,22 +276,25 @@ const styles = StyleSheet.create({
     scrollView: {
         flex: 1,
     },
+    scrollContent: {
+        flexGrow: 1,
+    },
     navbar: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingVertical: 15,
         paddingHorizontal: 20,
-        backgroundColor: '#1C1C3A'
+        backgroundColor: '#1C1C3A',
     },
     navTitle: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#fff'
+        color: '#fff',
     },
     navButtons: {
         flexDirection: 'row',
-        alignItems: 'center'
+        alignItems: 'center',
     },
     navButton: {
         marginLeft: 15,
@@ -235,82 +302,82 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         borderRadius: 6,
         borderWidth: 1,
-        borderColor: '#6C63FF'
+        borderColor: '#6C63FF',
     },
     navButtonText: {
         color: '#6C63FF',
-        fontWeight: 'bold'
+        fontWeight: 'bold',
     },
     signUpButton: {
-        backgroundColor: '#6C63FF'
+        backgroundColor: '#6C63FF',
     },
     signUpButtonText: {
-        color: '#fff'
+        color: '#fff',
     },
     hero: {
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 60,
-        backgroundColor: '#1C1C3A'
+        backgroundColor: '#1C1C3A',
     },
     logo: {
         width: 90,
         height: 90,
-        marginBottom: 20
+        marginBottom: 20,
     },
     title: {
         fontSize: 32,
         fontWeight: 'bold',
         color: '#fff',
-        marginBottom: 8
+        marginBottom: 8,
     },
     subtitle: {
         fontSize: 16,
         color: '#CFCFCF',
         textAlign: 'center',
         paddingHorizontal: 40,
-        marginBottom: 20
+        marginBottom: 20,
     },
     ctaButton: {
         backgroundColor: '#6C63FF',
         paddingVertical: 12,
         paddingHorizontal: 40,
         borderRadius: 30,
-        marginTop: 10
+        marginTop: 10,
     },
     ctaText: {
         color: '#fff',
         fontSize: 16,
-        fontWeight: 'bold'
+        fontWeight: 'bold',
     },
     featuresSection: {
         backgroundColor: '#0B0B1D',
         paddingVertical: 40,
-        paddingHorizontal: 20
+        paddingHorizontal: 20,
     },
     sectionTitle: {
         fontSize: 22,
         fontWeight: 'bold',
         color: '#fff',
         marginBottom: 20,
-        textAlign: 'center'
+        textAlign: 'center',
     },
     featureCard: {
         backgroundColor: '#1C1C3A',
         borderRadius: 12,
         padding: 20,
-        marginBottom: 16
+        marginBottom: 16,
     },
     featureTitle: {
         fontSize: 18,
         color: '#6C63FF',
         fontWeight: 'bold',
-        marginBottom: 8
+        marginBottom: 8,
     },
     featureDesc: {
         color: '#CFCFCF',
         fontSize: 14,
-        lineHeight: 20
+        lineHeight: 20,
     },
     footer: {
         paddingVertical: 20,
@@ -320,51 +387,67 @@ const styles = StyleSheet.create({
     },
     footerText: {
         color: '#CFCFCF',
-        fontSize: 12
+        fontSize: 12,
     },
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.7)',
         justifyContent: 'center',
-        alignItems: 'center'
+        alignItems: 'center',
     },
     modalContent: {
-        width: '85%',
+        width: 340,
         backgroundColor: '#1C1C3A',
         borderRadius: 12,
-        padding: 20
+        padding: 20,
     },
     modalTitle: {
         fontSize: 24,
         fontWeight: 'bold',
         color: '#fff',
         marginBottom: 20,
-        textAlign: 'center'
+        textAlign: 'center',
     },
     input: {
         backgroundColor: '#0B0B1D',
         color: '#fff',
         padding: 12,
         borderRadius: 8,
-        marginBottom: 12
+        marginBottom: 12,
+        fontSize: 16,
+    },
+    passwordContainer: {
+        position: 'relative',
+        marginBottom: 12,
+    },
+    passwordInput: {
+        paddingRight: 50,
+        marginBottom: 0,
+    },
+    eyeIcon: {
+        position: 'absolute',
+        right: 12,
+        top: 12,
     },
     modalButton: {
         backgroundColor: '#6C63FF',
         padding: 12,
         borderRadius: 8,
         alignItems: 'center',
-        marginBottom: 10
+        marginTop: 8,
+        marginBottom: 10,
     },
     modalButtonText: {
         color: '#fff',
         fontWeight: 'bold',
-        fontSize: 16
+        fontSize: 16,
     },
     modalCloseButton: {
-        alignItems: 'center'
+        alignItems: 'center',
+        paddingVertical: 8,
     },
     modalCloseButtonText: {
-        color: '#fff',
-        fontSize: 16
+        color: '#CFCFCF',
+        fontSize: 16,
     },
 });
