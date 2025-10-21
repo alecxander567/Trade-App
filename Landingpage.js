@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, StatusBar, Modal, TextInput, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Landingpage() {
     const navigation = useNavigation();
@@ -40,22 +41,18 @@ export default function Landingpage() {
     };
 
     const handleLogin = async () => {
-        if (!email || !password) {
-            alert("Please fill all fields");
-            return;
-        }
         try {
             const response = await fetch('http://192.168.1.99:5000/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
             });
+
             const data = await response.json();
+
             if (response.ok) {
-                alert(`Welcome back, ${data.user.username}!`);
-                setLoginModalVisible(false);
-                setEmail('');
-                setPassword('');
+                await AsyncStorage.setItem('userId', data.user._id);
+
                 navigation.replace('Homepage');
             } else {
                 alert(data.error || 'Login failed');

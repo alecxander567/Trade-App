@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Homepage() {
     const navigation = useNavigation();
@@ -12,6 +13,8 @@ export default function Homepage() {
     const [itemDescription, setItemDescription] = useState('');
     const [itemImage, setItemImage] = useState(null);
     const [items, setItems] = useState([]);
+    const [activeTab, setActiveTab] = useState('home');
+    const [currentUserId, setCurrentUserId] = useState(null);
 
     const pickImage = async () => {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -104,6 +107,14 @@ export default function Homepage() {
         return () => clearInterval(intervalId);
     }, []);
 
+    useEffect(() => {
+        const loadUserId = async () => {
+            const id = await AsyncStorage.getItem('userId');
+            setCurrentUserId(id);
+        };
+        loadUserId();
+    }, []);
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.appWrapper}>
@@ -127,7 +138,6 @@ export default function Homepage() {
                                 });
                                 const data = await response.json();
                                 if (response.ok) {
-                                    alert(data.message);
                                     navigation.replace('LoginScreen');
                                 } else {
                                     alert(data.error || 'Logout failed');
@@ -153,7 +163,7 @@ export default function Homepage() {
                         <View
                             key={index}
                             style={{
-                                backgroundColor: '#1C1C3A', // dark background
+                                backgroundColor: '#1C1C3A',
                                 borderRadius: 15,
                                 padding: 15,
                                 marginVertical: 10,
@@ -218,67 +228,179 @@ export default function Homepage() {
                             <View
                                 style={{
                                     flexDirection: 'row',
-                                    justifyContent: 'flex-end',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
                                 }}
                             >
                                 <TouchableOpacity
                                     style={{
-                                        backgroundColor: '#FFD700',
-                                        paddingVertical: 10,
-                                        paddingHorizontal: 16,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        backgroundColor: '#2E2E50',
+                                        paddingVertical: 8,
+                                        paddingHorizontal: 12,
                                         borderRadius: 10,
-                                        marginLeft: 10,
                                     }}
-                                    onPress={() => console.log(`Trade Later pressed for ${item.name}`)}
+                                    onPress={async () => {
+                                        if (!currentUserId) {
+                                            alert('Please wait, loading user...');
+                                            return;
+                                        }
+
+                                        try {
+                                            const response = await fetch(`http://192.168.1.99:5000/api/items/${item._id}/star`, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ userId: currentUserId }),
+                                            });
+
+                                            const data = await response.json();
+
+                                            if (response.ok) {
+                                                const updatedItems = [...items];
+                                                updatedItems[index].stars = data.stars;
+                                                setItems(updatedItems);
+                                            } else {
+                                                alert(data.error || 'Failed to update star');
+                                            }
+                                        } catch (err) {
+                                            console.error('Error toggling star:', err);
+                                            alert('Unable to connect to server.');
+                                        }
+                                    }}
                                 >
-                                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>Trade Later</Text>
+                                    <Ionicons name="star" size={20} color="#FFD700" />
+                                    <Text style={{ color: '#fff', marginLeft: 6 }}>{item.stars || 0}</Text>
                                 </TouchableOpacity>
 
-                                <TouchableOpacity
-                                    style={{
-                                        backgroundColor: '#1E90FF',
-                                        paddingVertical: 10,
-                                        paddingHorizontal: 16,
-                                        borderRadius: 10,
-                                        marginLeft: 10,
-                                    }}
-                                    onPress={() => console.log(`Offer Trade pressed for ${item.name}`)}
-                                >
-                                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>Offer Trade</Text>
-                                </TouchableOpacity>
+                                {/* Trade Buttons */}
+                                <View style={{ flexDirection: 'row' }}>
+                                    <TouchableOpacity
+                                        style={{
+                                            backgroundColor: '#FFD700',
+                                            paddingVertical: 10,
+                                            paddingHorizontal: 16,
+                                            borderRadius: 10,
+                                            marginLeft: 10,
+                                        }}
+                                        onPress={() => console.log(`Trade Later pressed for ${item.name}`)}
+                                    >
+                                        <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>Trade Later</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={{
+                                            backgroundColor: '#1E90FF',
+                                            paddingVertical: 10,
+                                            paddingHorizontal: 16,
+                                            borderRadius: 10,
+                                            marginLeft: 10,
+                                        }}
+                                        onPress={() => console.log(`Offer Trade pressed for ${item.name}`)}
+                                    >
+                                        <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>Offer Trade</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </View>
                     ))
                 )}
             </ScrollView>
 
-            <View style={styles.footer}>
-                <View style={styles.menuGroup}>
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Ionicons name="home-outline" size={24} color="#fff" />
-                        <Text style={styles.menuText}>Home</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Ionicons name="swap-horizontal-outline" size={24} color="#fff" />
-                        <Text style={styles.menuText}>Trades</Text>
+                <View style={styles.footer}>
+                    <View style={styles.menuGroup}>
+                        <TouchableOpacity
+                            style={[styles.menuItem, activeTab === 'home' && styles.activeMenuItem]}
+                            onPress={() => setActiveTab('home')}
+                        >
+                            <Ionicons
+                                name={activeTab === 'home' ? 'home' : 'home-outline'}
+                                size={24}
+                                color={activeTab === 'home' ? '#FFD700' : '#fff'}
+                            />
+                            <Text
+                                style={[
+                                    styles.menuText,
+                                    activeTab === 'home' && styles.activeMenuText
+                                ]}
+                            >
+                                Home
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.menuItem, activeTab === 'trades' && styles.activeMenuItem]}
+                            onPress={() => {
+                                setActiveTab('trades');
+                                navigation.navigate('TradesScreen');
+                            }}
+                        >
+                            <Ionicons
+                                name={activeTab === 'trades' ? 'swap-horizontal' : 'swap-horizontal-outline'}
+                                size={24}
+                                color={activeTab === 'trades' ? '#FFD700' : '#fff'}
+                            />
+                            <Text
+                                style={[
+                                    styles.menuText,
+                                    activeTab === 'trades' && styles.activeMenuText
+                                ]}
+                            >
+                                Trades
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.menuGroup}>
+                        <TouchableOpacity
+                            style={[styles.menuItem, activeTab === 'partners' && styles.activeMenuItem]}
+                            onPress={() => {
+                                setActiveTab('partners');
+                                navigation.navigate('PartnersScreen');
+                            }}
+                        >
+                            <Ionicons
+                                name={activeTab === 'partners' ? 'people' : 'people-outline'}
+                                size={24}
+                                color={activeTab === 'partners' ? '#FFD700' : '#fff'}
+                            />
+                            <Text
+                                style={[
+                                    styles.menuText,
+                                    activeTab === 'partners' && styles.activeMenuText
+                                ]}
+                            >
+                                Partners
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.menuItem, activeTab === 'items' && styles.activeMenuItem]}
+                            onPress={() => {
+                                setActiveTab('items');
+                                navigation.navigate('ItemsScreen');
+                            }}
+                        >
+                            <Ionicons
+                                name={activeTab === 'items' ? 'cube' : 'cube-outline'}
+                                size={24}
+                                color={activeTab === 'items' ? '#FFD700' : '#fff'}
+                            />
+                            <Text
+                                style={[
+                                    styles.menuText,
+                                    activeTab === 'items' && styles.activeMenuText
+                                ]}
+                            >
+                                Items
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity style={styles.centerButton} onPress={() => setModalVisible(true)}>
+                        <Ionicons name="add" size={32} color="#fff" />
                     </TouchableOpacity>
                 </View>
-
-                <View style={styles.menuGroup}>
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Ionicons name="people-outline" size={24} color="#fff" />
-                        <Text style={styles.menuText}>Partners</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.menuItem}>
-                        <Ionicons name="cube-outline" size={24} color="#fff" />
-                        <Text style={styles.menuText}>Items</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity style={styles.centerButton} onPress={() => setModalVisible(true)}>
-                    <Ionicons name="add" size={32} color="#fff" />
-                </TouchableOpacity>
-            </View>
             </View>
 
 
@@ -449,7 +571,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         borderBottomWidth: 1,
         borderBottomColor: '#2E2E50',
-        paddingTop: 10
+        paddingTop: 5
     },
     navTitle: {
         color: '#fff',
@@ -539,6 +661,15 @@ const styles = StyleSheet.create({
     },
     buttonText: {
         color: '#fff',
+        fontWeight: 'bold',
+    },
+    activeMenuItem: {
+        borderTopWidth: 2,
+        borderTopColor: '#FFD700',
+    },
+
+    activeMenuText: {
+        color: '#FFD700',
         fontWeight: 'bold',
     },
 });
