@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Image, ScrollView, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Homepage() {
     const navigation = useNavigation();
+    const route = useRoute();
+    const currentRoute = route.name;
     const [modalVisible, setModalVisible] = useState(false);
     const [itemName, setItemName] = useState('');
     const [itemDescription, setItemDescription] = useState('');
@@ -36,7 +38,7 @@ export default function Homepage() {
     };
 
     const handlePostItem = async () => {
-        if (!itemName || !itemDescription || !itemImage) {
+        if (!itemName || !itemDescription || !itemImage || !currentUserId) {
             alert('Please complete all fields before posting.');
             return;
         }
@@ -45,6 +47,7 @@ export default function Homepage() {
             const formData = new FormData();
             formData.append('name', itemName);
             formData.append('description', itemDescription);
+            formData.append('owner', currentUserId);
 
             let uri = itemImage;
             if (Platform.OS === 'android' && uri.startsWith('content://')) {
@@ -71,6 +74,8 @@ export default function Homepage() {
                 setItemDescription('');
                 setItemImage(null);
                 setModalVisible(false);
+
+                setItems(prev => [data.item, ...prev]);
             } else {
                 alert(data.error || 'Failed to post item.');
             }
@@ -81,38 +86,34 @@ export default function Homepage() {
     };
 
     useEffect(() => {
-        const fetchItems = async () => {
+        const loadUserAndFetchItems = async () => {
             try {
-                const response = await fetch('http://192.168.1.99:5000/api/items', {
+                let id = await AsyncStorage.getItem('userId');
+                if (!id) return;
+
+                id = id.replace(/"/g, '');
+                setCurrentUserId(id);
+
+                const response = await fetch(`http://192.168.1.99:5000/api/items?userId=${id}`, {
                     method: 'GET',
                     credentials: 'include',
                 });
 
                 const data = await response.json();
-
                 if (response.ok) {
                     setItems(data.items);
                 } else {
                     console.log(data.error || 'Failed to load items');
                 }
-            } catch (error) {
-                console.error('Error fetching items:', error);
+            } catch (err) {
+                console.error('Error fetching items:', err);
             }
         };
 
-        fetchItems();
+        loadUserAndFetchItems();
 
-        const intervalId = setInterval(fetchItems, 5000);
-
+        const intervalId = setInterval(loadUserAndFetchItems, 5000);
         return () => clearInterval(intervalId);
-    }, []);
-
-    useEffect(() => {
-        const loadUserId = async () => {
-            const id = await AsyncStorage.getItem('userId');
-            setCurrentUserId(id);
-        };
-        loadUserId();
     }, []);
 
     return (
@@ -259,6 +260,7 @@ export default function Homepage() {
                                             if (response.ok) {
                                                 const updatedItems = [...items];
                                                 updatedItems[index].stars = data.stars;
+                                                updatedItems[index].starred = data.starred;
                                                 setItems(updatedItems);
                                             } else {
                                                 alert(data.error || 'Failed to update star');
@@ -310,18 +312,18 @@ export default function Homepage() {
                 <View style={styles.footer}>
                     <View style={styles.menuGroup}>
                         <TouchableOpacity
-                            style={[styles.menuItem, activeTab === 'home' && styles.activeMenuItem]}
-                            onPress={() => setActiveTab('home')}
+                            style={[styles.menuItem, currentRoute === 'Homepage' && styles.activeMenuItem]}
+                            onPress={() => navigation.navigate('Homepage')}
                         >
                             <Ionicons
-                                name={activeTab === 'home' ? 'home' : 'home-outline'}
+                                name={currentRoute === 'Homepage' ? 'home' : 'home-outline'}
                                 size={24}
-                                color={activeTab === 'home' ? '#FFD700' : '#fff'}
+                                color={currentRoute === 'Homepage' ? '#FFD700' : '#fff'}
                             />
                             <Text
                                 style={[
                                     styles.menuText,
-                                    activeTab === 'home' && styles.activeMenuText
+                                    currentRoute === 'Homepage' && styles.activeMenuText
                                 ]}
                             >
                                 Home
@@ -353,21 +355,18 @@ export default function Homepage() {
 
                     <View style={styles.menuGroup}>
                         <TouchableOpacity
-                            style={[styles.menuItem, activeTab === 'partners' && styles.activeMenuItem]}
-                            onPress={() => {
-                                setActiveTab('partners');
-                                navigation.navigate('PartnersScreen');
-                            }}
+                            style={[styles.menuItem, currentRoute === 'Partners' && styles.activeMenuItem]}
+                            onPress={() => navigation.navigate('Partners')}
                         >
                             <Ionicons
-                                name={activeTab === 'partners' ? 'people' : 'people-outline'}
+                                name={currentRoute === 'Partners' ? 'people' : 'people-outline'}
                                 size={24}
-                                color={activeTab === 'partners' ? '#FFD700' : '#fff'}
+                                color={currentRoute === 'Partners' ? '#FFD700' : '#fff'}
                             />
                             <Text
                                 style={[
                                     styles.menuText,
-                                    activeTab === 'partners' && styles.activeMenuText
+                                    currentRoute === 'Partners' && styles.activeMenuText
                                 ]}
                             >
                                 Partners
