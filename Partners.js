@@ -48,6 +48,22 @@ export default function Partners() {
                             <Ionicons name="person-circle-outline" size={28} color="#fff" />
                         </TouchableOpacity>
 
+                        <TouchableOpacity style={{ marginRight: 20 }} onPress={() => console.log('Notifications pressed')}>
+                            <Ionicons name="notifications-outline" size={26} color="#fff" />
+                            {/* Optional badge for unread notifications */}
+                            <View
+                                style={{
+                                    position: 'absolute',
+                                    right: 10,
+                                    top: 2,
+                                    backgroundColor: 'red',
+                                    borderRadius: 8,
+                                    width: 10,
+                                    height: 10,
+                                }}
+                            />
+                        </TouchableOpacity>
+
                         {/* Log Out Button */}
                         <TouchableOpacity
                             style={styles.logoutButton}

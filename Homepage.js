@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Image, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Image, ScrollView, SafeAreaView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -17,6 +17,11 @@ export default function Homepage() {
     const [items, setItems] = useState([]);
     const [activeTab, setActiveTab] = useState('home');
     const [currentUserId, setCurrentUserId] = useState(null);
+    const [menuVisible, setMenuVisible] = useState(null);
+    const [editModalVisible, setEditModalVisible] = useState(false);
+    const [editItem, setEditItem] = useState(null);
+    const [editedName, setEditedName] = useState('');
+    const [editedDescription, setEditedDescription] = useState('');
 
     const pickImage = async () => {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -116,6 +121,35 @@ export default function Homepage() {
         return () => clearInterval(intervalId);
     }, []);
 
+    const handleEditSave = async () => {
+        if (!editItem) return;
+
+        try {
+            const response = await fetch(`http://192.168.1.99:5000/api/items/${editItem._id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: editedName,
+                    description: editedDescription,
+                    userId: currentUserId
+                }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                const updated = items.map(i => (i._id === editItem._id ? data.item : i));
+                setItems(updated);
+                setEditModalVisible(false);
+            } else {
+                alert(data.error || 'Failed to update item');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error connecting to server');
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.appWrapper}>
@@ -126,6 +160,21 @@ export default function Homepage() {
                     {/* Profile Icon */}
                     <TouchableOpacity style={{ marginRight: 20 }} onPress={() => console.log('Profile pressed')}>
                         <Ionicons name="person-circle-outline" size={28} color="#fff" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={{ marginRight: 20 }} onPress={() => console.log('Notifications pressed')}>
+                        <Ionicons name="notifications-outline" size={26} color="#fff" />
+                        <View
+                            style={{
+                                position: 'absolute',
+                                right: 10,
+                                top: 2,
+                                backgroundColor: 'red',
+                                borderRadius: 8,
+                                width: 10,
+                                height: 10,
+                            }}
+                        />
                     </TouchableOpacity>
 
                     {/* Log Out Button */}
@@ -155,159 +204,245 @@ export default function Homepage() {
             </View>
 
                 <ScrollView style={styles.scrollView}>
-                {items.length === 0 ? (
-                    <Text style={{ color: '#aaa', textAlign: 'center', marginTop: 20 }}>
-                        No items found.
-                    </Text>
-                ) : (
-                    items.map((item, index) => (
-                        <View
-                            key={index}
-                            style={{
-                                backgroundColor: '#1C1C3A',
-                                borderRadius: 15,
-                                padding: 15,
-                                marginVertical: 10,
-                                shadowColor: '#000',
-                                shadowOffset: { width: 0, height: 3 },
-                                shadowOpacity: 0.4,
-                                shadowRadius: 6,
-                                elevation: 8,
-                            }}
-                        >
-                            {/* Image */}
-                            {item.image && (
-                                <Image
-                                    source={{ uri: `http://192.168.1.99:5000${item.image}` }}
-                                    style={{
-                                        width: '100%',
-                                        height: 200,
-                                        borderRadius: 12,
-                                        marginBottom: 12,
-                                    }}
-                                    resizeMode="cover"
-                                />
-                            )}
-
-                            <Text
-                                style={{
-                                    color: '#6C63FF',
-                                    fontSize: 18,
-                                    fontWeight: 'bold',
-                                    marginBottom: 6,
-                                }}
-                            >
-                                {item.name}
-                            </Text>
-
-                            <Text
-                                style={{
-                                    color: '#D8BFD8',
-                                    fontSize: 14,
-                                    marginBottom: 4,
-                                }}
-                            >
-                                {item.description}
-                            </Text>
-
-                            <Text
-                                style={{
-                                    color: '#aaa',
-                                    fontSize: 12,
-                                    fontStyle: 'italic',
-                                    textAlign: 'left',
-                                    marginBottom: 12,
-                                }}
-                            >
-                                Posted on {new Date(item.createdAt).toLocaleDateString()} at{' '}
-                                {new Date(item.createdAt).toLocaleTimeString([], {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                })}
-                            </Text>
-
+                    {items.length === 0 ? (
+                        <Text style={{ color: '#aaa', textAlign: 'center', marginTop: 20 }}>
+                            No items found.
+                        </Text>
+                    ) : (
+                        items.map((item, index) => (
                             <View
+                                key={index}
                                 style={{
-                                    flexDirection: 'row',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
+                                    backgroundColor: '#1C1C3A',
+                                    borderRadius: 15,
+                                    padding: 15,
+                                    marginVertical: 10,
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 3 },
+                                    shadowOpacity: 0.4,
+                                    shadowRadius: 6,
+                                    elevation: 8,
                                 }}
                             >
-                                <TouchableOpacity
+                                {/* Image */}
+                                {item.image && (
+                                    <Image
+                                        source={{ uri: `http://192.168.1.99:5000${item.image}` }}
+                                        style={{
+                                            width: '100%',
+                                            height: 200,
+                                            borderRadius: 12,
+                                            marginBottom: 12,
+                                        }}
+                                        resizeMode="cover"
+                                    />
+                                )}
+
+                                <View
                                     style={{
                                         flexDirection: 'row',
+                                        justifyContent: 'space-between',
                                         alignItems: 'center',
-                                        backgroundColor: '#2E2E50',
-                                        paddingVertical: 8,
-                                        paddingHorizontal: 12,
-                                        borderRadius: 10,
-                                    }}
-                                    onPress={async () => {
-                                        if (!currentUserId) {
-                                            alert('Please wait, loading user...');
-                                            return;
-                                        }
-
-                                        try {
-                                            const response = await fetch(`http://192.168.1.99:5000/api/items/${item._id}/star`, {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ userId: currentUserId }),
-                                            });
-
-                                            const data = await response.json();
-
-                                            if (response.ok) {
-                                                const updatedItems = [...items];
-                                                updatedItems[index].stars = data.stars;
-                                                updatedItems[index].starred = data.starred;
-                                                setItems(updatedItems);
-                                            } else {
-                                                alert(data.error || 'Failed to update star');
-                                            }
-                                        } catch (err) {
-                                            console.error('Error toggling star:', err);
-                                            alert('Unable to connect to server.');
-                                        }
+                                        marginBottom: 6,
                                     }}
                                 >
-                                    <Ionicons name="star" size={20} color="#FFD700" />
-                                    <Text style={{ color: '#fff', marginLeft: 6 }}>{item.stars || 0}</Text>
-                                </TouchableOpacity>
-
-                                {/* Trade Buttons */}
-                                <View style={{ flexDirection: 'row' }}>
-                                    <TouchableOpacity
+                                    <Text
                                         style={{
-                                            backgroundColor: '#FFD700',
-                                            paddingVertical: 10,
-                                            paddingHorizontal: 16,
-                                            borderRadius: 10,
-                                            marginLeft: 10,
+                                            color: '#6C63FF',
+                                            fontSize: 18,
+                                            fontWeight: 'bold',
+                                            flex: 1,
                                         }}
-                                        onPress={() => console.log(`Trade Later pressed for ${item.name}`)}
                                     >
-                                        <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>Trade Later</Text>
+                                        {item.name}
+                                    </Text>
+
+                                    <TouchableOpacity onPress={() => setMenuVisible(menuVisible === index ? null : index)}>
+                                        <Ionicons name="ellipsis-vertical" size={20} color="#fff" />
                                     </TouchableOpacity>
 
+                                    {/* Popup Menu */}
+                                    {menuVisible === index && (
+                                        <View
+                                            style={{
+                                                position: 'absolute',
+                                                right: 5,
+                                                top: 30,
+                                                backgroundColor: '#2E2E50',
+                                                borderRadius: 10,
+                                                paddingVertical: 6,
+                                                paddingHorizontal: 12,
+                                                elevation: 6,
+                                                zIndex: 999,
+                                            }}
+                                        >
+                                            <TouchableOpacity
+                                                onPress={() => {
+                                                    setEditItem(item);
+                                                    setEditedName(item.name);
+                                                    setEditedDescription(item.description);
+                                                    setMenuVisible(null);
+                                                    setEditModalVisible(true);
+                                                }}
+                                            >
+                                                <Text style={{ color: '#fff', paddingVertical: 4 }}>Edit Post</Text>
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity
+                                                onPress={async () => {
+                                                    Alert.alert(
+                                                        "Delete Post",
+                                                        "Are you sure you want to delete this post?",
+                                                        [
+                                                            { text: "Cancel", style: "cancel" },
+                                                            {
+                                                                text: "Delete",
+                                                                style: "destructive",
+                                                                onPress: async () => {
+                                                                    try {
+                                                                        const response = await fetch(`http://192.168.1.99:5000/api/items/${item._id}`, {
+                                                                            method: 'DELETE',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({ userId: currentUserId }),
+                                                                        });
+
+                                                                        if (response.ok) {
+                                                                            const updatedItems = items.filter(i => i._id !== item._id);
+                                                                            setItems(updatedItems);
+                                                                            alert("Post deleted successfully!");
+                                                                        } else {
+                                                                            const data = await response.json();
+                                                                            alert(data.error || "Failed to delete post");
+                                                                        }
+                                                                    } catch (err) {
+                                                                        console.error("Error deleting post:", err);
+                                                                        alert("Unable to connect to server.");
+                                                                    }
+
+                                                                    setMenuVisible(null);
+                                                                }
+                                                            }
+                                                        ]
+                                                    );
+                                                }}
+                                            >
+                                                <Text style={{ color: 'red', paddingVertical: 4 }}>Delete Post</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </View>
+
+                                {/* Description */}
+                                <Text
+                                    style={{
+                                        color: '#D8BFD8',
+                                        fontSize: 14,
+                                        marginBottom: 4,
+                                    }}
+                                >
+                                    {item.description}
+                                </Text>
+
+                                {/* Date */}
+                                <Text
+                                    style={{
+                                        color: '#aaa',
+                                        fontSize: 12,
+                                        fontStyle: 'italic',
+                                        textAlign: 'left',
+                                        marginBottom: 12,
+                                    }}
+                                >
+                                    Posted on {new Date(item.createdAt).toLocaleDateString()} at{' '}
+                                    {new Date(item.createdAt).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                    })}
+                                </Text>
+
+                                {/* Star + Trade Buttons */}
+                                <View
+                                    style={{
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                    }}
+                                >
                                     <TouchableOpacity
                                         style={{
-                                            backgroundColor: '#1E90FF',
-                                            paddingVertical: 10,
-                                            paddingHorizontal: 16,
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            backgroundColor: '#2E2E50',
+                                            paddingVertical: 8,
+                                            paddingHorizontal: 12,
                                             borderRadius: 10,
-                                            marginLeft: 10,
                                         }}
-                                        onPress={() => console.log(`Offer Trade pressed for ${item.name}`)}
+                                        onPress={async () => {
+                                            if (!currentUserId) {
+                                                alert('Please wait, loading user...');
+                                                return;
+                                            }
+
+                                            try {
+                                                const response = await fetch(`http://192.168.1.99:5000/api/items/${item._id}/star`, {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ userId: currentUserId }),
+                                                });
+
+                                                const data = await response.json();
+
+                                                if (response.ok) {
+                                                    const updatedItems = [...items];
+                                                    updatedItems[index].stars = data.stars;
+                                                    updatedItems[index].starred = data.starred;
+                                                    setItems(updatedItems);
+                                                } else {
+                                                    alert(data.error || 'Failed to update star');
+                                                }
+                                            } catch (err) {
+                                                console.error('Error toggling star:', err);
+                                                alert('Unable to connect to server.');
+                                            }
+                                        }}
                                     >
-                                        <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>Offer Trade</Text>
+                                        <Ionicons name="star" size={20} color="#FFD700" />
+                                        <Text style={{ color: '#fff', marginLeft: 6 }}>{item.stars || 0}</Text>
                                     </TouchableOpacity>
+
+                                    {/* Trade Buttons */}
+                                    <View style={{ flexDirection: 'row' }}>
+                                        <TouchableOpacity
+                                            style={{
+                                                backgroundColor: '#FFD700',
+                                                paddingVertical: 10,
+                                                paddingHorizontal: 16,
+                                                borderRadius: 10,
+                                                marginLeft: 10,
+                                            }}
+                                            onPress={() => console.log(`Trade Later pressed for ${item.name}`)}
+                                        >
+                                            <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>Trade Later</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={{
+                                                backgroundColor: '#1E90FF',
+                                                paddingVertical: 10,
+                                                paddingHorizontal: 16,
+                                                borderRadius: 10,
+                                                marginLeft: 10,
+                                            }}
+                                            onPress={() => console.log(`Offer Trade pressed for ${item.name}`)}
+                                        >
+                                            <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>Offer Trade</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
                             </View>
-                        </View>
-                    ))
-                )}
-            </ScrollView>
+                        ))
+                    )}
+                </ScrollView>
 
                 <View style={styles.footer}>
                     <View style={styles.menuGroup}>
@@ -472,6 +607,66 @@ export default function Homepage() {
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.postButton} onPress={handlePostItem}>
                                 <Text style={styles.buttonText}>Post Item</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Edit Modal */}
+            <Modal visible={editModalVisible} transparent={true} animationType="slide">
+                <View style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                }}>
+                    <View style={{
+                        backgroundColor: '#1C1C3A',
+                        padding: 20,
+                        borderRadius: 12,
+                        width: '85%'
+                    }}>
+                        <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
+                            Edit Post
+                        </Text>
+
+                        <TextInput
+                            value={editedName}
+                            onChangeText={setEditedName}
+                            placeholder="Item name"
+                            placeholderTextColor="#999"
+                            style={{
+                                backgroundColor: '#2E2E50',
+                                color: '#fff',
+                                borderRadius: 10,
+                                padding: 10,
+                                marginBottom: 10
+                            }}
+                        />
+
+                        <TextInput
+                            value={editedDescription}
+                            onChangeText={setEditedDescription}
+                            placeholder="Description"
+                            placeholderTextColor="#999"
+                            style={{
+                                backgroundColor: '#2E2E50',
+                                color: '#fff',
+                                borderRadius: 10,
+                                padding: 10,
+                                marginBottom: 15
+                            }}
+                            multiline
+                        />
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+                            <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                                <Text style={{ color: '#aaa', marginRight: 20 }}>Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={handleEditSave}>
+                                <Text style={{ color: '#6C63FF', fontWeight: 'bold' }}>Save</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
