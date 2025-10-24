@@ -137,16 +137,14 @@ export default function Partners() {
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={{ marginRight: 20 }}
+                            style={{ marginRight: 20, position: 'relative' }}
                             onPress={() => {
-                                if (!dropdownVisible) {
-                                    fetchNotifications();
-                                }
+                                if (!dropdownVisible) fetchNotifications();
                                 setDropdownVisible(!dropdownVisible);
                             }}
                         >
                             <Ionicons name="notifications-outline" size={26} color="#fff" />
-                            {notifications.some(n => !n.isRead) && (
+                            {notifications.some(n => !n.isRead) && !dropdownVisible && (
                                 <View
                                     style={{
                                         position: 'absolute',
@@ -162,22 +160,20 @@ export default function Partners() {
                         </TouchableOpacity>
 
                         {dropdownVisible && (
-                            <View
-                                style={{
-                                    position: 'absolute',
-                                    top: 60,
-                                    right: 10,
-                                    backgroundColor: '#1C1C3A',
-                                    borderRadius: 12,
-                                    padding: 10,
-                                    shadowColor: '#000',
-                                    shadowOpacity: 0.3,
-                                    shadowRadius: 6,
-                                    width: 280,
-                                    maxHeight: 400,
-                                    zIndex: 999,
-                                }}
-                            >
+                            <View style={{
+                                position: 'absolute',
+                                top: 60,
+                                right: 10,
+                                backgroundColor: '#1C1C3A',
+                                borderRadius: 12,
+                                padding: 10,
+                                shadowColor: '#000',
+                                shadowOpacity: 0.3,
+                                shadowRadius: 6,
+                                width: 280,
+                                maxHeight: 400,
+                                zIndex: 999,
+                            }}>
                                 {notifications.length === 0 ? (
                                     <Text style={{ color: '#fff', textAlign: 'center', paddingVertical: 10 }}>
                                         No notifications
@@ -195,45 +191,21 @@ export default function Partners() {
                                                 borderLeftWidth: 3,
                                                 borderLeftColor: notif.isRead ? '#444' : '#6C63FF',
                                             }}
-                                            onPress={() => {
-                                                if (!notif.isRead) {
-                                                    fetch(`http://192.168.1.99:5000/api/notifications/${notif._id}/read`, {
-                                                        method: 'PUT',
-                                                    }).then(() => {
-                                                        fetchNotifications();
-                                                    });
-                                                }
-                                            }}
+                                            onPress={() => handleNotificationClick(notif)}
                                         >
                                             <Text style={{ color: '#fff', fontSize: 14, marginBottom: 8 }}>
                                                 {notif.message}
                                             </Text>
                                             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
                                                 <TouchableOpacity
-                                                    style={{
-                                                        backgroundColor: '#28A745',
-                                                        paddingVertical: 5,
-                                                        paddingHorizontal: 10,
-                                                        borderRadius: 6,
-                                                    }}
-                                                    onPress={(e) => {
-                                                        e.stopPropagation();
-                                                        handleNotificationAction(notif._id, 'accept');
-                                                    }}
+                                                    style={{ backgroundColor: '#28A745', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 6 }}
+                                                    onPress={(e) => { e.stopPropagation(); handleNotificationAction(notif._id, 'accept'); }}
                                                 >
                                                     <Text style={{ color: '#fff', fontSize: 12 }}>Accept</Text>
                                                 </TouchableOpacity>
                                                 <TouchableOpacity
-                                                    style={{
-                                                        backgroundColor: '#DC3545',
-                                                        paddingVertical: 5,
-                                                        paddingHorizontal: 10,
-                                                        borderRadius: 6,
-                                                    }}
-                                                    onPress={(e) => {
-                                                        e.stopPropagation();
-                                                        handleNotificationAction(notif._id, 'reject');
-                                                    }}
+                                                    style={{ backgroundColor: '#DC3545', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 6 }}
+                                                    onPress={(e) => { e.stopPropagation(); handleNotificationAction(notif._id, 'reject'); }}
                                                 >
                                                     <Text style={{ color: '#fff', fontSize: 12 }}>Reject</Text>
                                                 </TouchableOpacity>
@@ -268,7 +240,6 @@ export default function Partners() {
                         </TouchableOpacity>
                     </View>
                 </View>
-
 
                 <ScrollView style={[styles.scrollView, { marginTop: 20 }]}>
                     {users.length === 0 ? (

@@ -22,6 +22,9 @@ export default function Homepage() {
     const [editItem, setEditItem] = useState(null);
     const [editedName, setEditedName] = useState('');
     const [editedDescription, setEditedDescription] = useState('');
+    const [currentUsername, setCurrentUsername] = useState('');
+    const [notifications, setNotifications] = useState([]);
+    const [dropdownVisible, setDropdownVisible] = useState(false);
 
     const pickImage = async () => {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -91,6 +94,16 @@ export default function Homepage() {
     };
 
     useEffect(() => {
+        const loadUserData = async () => {
+            const id = await AsyncStorage.getItem('userId');
+            const username = await AsyncStorage.getItem('username');
+            setCurrentUserId(id);
+            setCurrentUsername(username);
+        };
+        loadUserData();
+    }, []);
+
+    useEffect(() => {
         const loadUserAndFetchItems = async () => {
             try {
                 let id = await AsyncStorage.getItem('userId');
@@ -150,58 +163,181 @@ export default function Homepage() {
         }
     };
 
+    const fetchNotifications = async () => {
+        if (!currentUserId) return;
+        try {
+            const res = await fetch(`http://192.168.1.99:5000/api/notifications/${currentUserId}`);
+            const data = await res.json();
+            setNotifications(data);
+        } catch (err) {
+            console.error('❌ Error fetching notifications:', err);
+        }
+    };
+
+    useEffect(() => {
+        if (currentUserId) fetchNotifications();
+    }, [currentUserId]);
+
+    const handleNotificationAction = async (notificationId, action) => {
+        try {
+            if (action === 'accept') {
+                await fetch(`http://192.168.1.99:5000/api/notifications/${notificationId}/accept`, { method: 'PUT' });
+                Alert.alert('Success', 'Trader request accepted!');
+            } else if (action === 'reject') {
+                await fetch(`http://192.168.1.99:5000/api/notifications/${notificationId}`, { method: 'DELETE' });
+                Alert.alert('Success', 'Trader request rejected.');
+            }
+            fetchNotifications();
+        } catch (err) {
+            console.error('Error handling notification:', err);
+            Alert.alert('Error', 'Failed to process notification.');
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.appWrapper}>
-            <View style={styles.navbar}>
-                <Text style={styles.navTitle}>Home</Text>
+                <View style={styles.navbar}>
+                    <Text style={styles.navTitle}>Home</Text>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    {/* Profile Icon */}
-                    <TouchableOpacity style={{ marginRight: 20 }} onPress={() => console.log('Profile pressed')}>
-                        <Ionicons name="person-circle-outline" size={28} color="#fff" />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <TouchableOpacity style={{ marginRight: 20 }} onPress={() => console.log('Profile pressed')}>
+                            <Ionicons name="person-circle-outline" size={28} color="#fff" />
+                        </TouchableOpacity>
 
-                    <TouchableOpacity style={{ marginRight: 20 }} onPress={() => console.log('Notifications pressed')}>
-                        <Ionicons name="notifications-outline" size={26} color="#fff" />
-                        <View
-                            style={{
-                                position: 'absolute',
-                                right: 10,
-                                top: 2,
-                                backgroundColor: 'red',
-                                borderRadius: 8,
-                                width: 10,
-                                height: 10,
-                            }}
-                        />
-                    </TouchableOpacity>
-
-                    {/* Log Out Button */}
-                    <TouchableOpacity
-                        style={styles.logoutButton}
-                        onPress={async () => {
-                            try {
-                                const response = await fetch('http://192.168.1.99:5000/api/auth/logout', {
-                                    method: 'POST',
-                                    credentials: 'include',
-                                });
-                                const data = await response.json();
-                                if (response.ok) {
-                                    navigation.replace('LoginScreen');
-                                } else {
-                                    alert(data.error || 'Logout failed');
+                        <TouchableOpacity
+                            style={{ marginRight: 20, position: 'relative' }}
+                            onPress={() => {
+                                if (!dropdownVisible) {
+                                    fetchNotifications();
                                 }
-                            } catch (err) {
-                                console.error(err);
-                                alert('Unable to connect to server.');
-                            }
-                        }}
-                    >
-                        <Text style={styles.logoutText}>Log Out</Text>
-                    </TouchableOpacity>
+                                setDropdownVisible(!dropdownVisible);
+                            }}
+                        >
+                            <Ionicons name="notifications-outline" size={26} color="#fff" />
+
+                            {notifications.length > 0 && !dropdownVisible && (
+                                <View
+                                    style={{
+                                        position: 'absolute',
+                                        right: 10,
+                                        top: 2,
+                                        backgroundColor: 'red',
+                                        borderRadius: 8,
+                                        width: 10,
+                                        height: 10,
+                                    }}
+                                />
+                            )}
+                        </TouchableOpacity>
+
+                        {dropdownVisible && (
+                            <View
+                                style={{
+                                    position: 'absolute',
+                                    top: 60,
+                                    right: 10,
+                                    backgroundColor: '#1C1C3A',
+                                    borderRadius: 12,
+                                    padding: 10,
+                                    shadowColor: '#000',
+                                    shadowOpacity: 0.3,
+                                    shadowRadius: 6,
+                                    width: 280,
+                                    maxHeight: 400,
+                                    zIndex: 999,
+                                }}
+                            >
+                                {notifications.length === 0 ? (
+                                    <Text style={{ color: '#fff', textAlign: 'center', paddingVertical: 10 }}>
+                                        No notifications
+                                    </Text>
+                                ) : (
+                                    notifications.map((notif, index) => (
+                                        <TouchableOpacity
+                                            key={notif._id || index}
+                                            activeOpacity={0.8}
+                                            style={{
+                                                backgroundColor: notif.isRead ? '#1E1E3A' : '#2E2E50',
+                                                borderRadius: 8,
+                                                padding: 10,
+                                                marginBottom: 10,
+                                                borderLeftWidth: 3,
+                                                borderLeftColor: notif.isRead ? '#444' : '#6C63FF',
+                                            }}
+                                            onPress={() => {
+                                                if (!notif.isRead) {
+                                                    fetch(`http://192.168.1.99:5000/api/notifications/${notif._id}/read`, {
+                                                        method: 'PUT',
+                                                    }).then(() => {
+                                                        fetchNotifications();
+                                                    });
+                                                }
+                                            }}
+                                        >
+                                            <Text style={{ color: '#fff', fontSize: 14, marginBottom: 8 }}>
+                                                {notif.message}
+                                            </Text>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+                                                <TouchableOpacity
+                                                    style={{
+                                                        backgroundColor: '#28A745',
+                                                        paddingVertical: 5,
+                                                        paddingHorizontal: 10,
+                                                        borderRadius: 6,
+                                                    }}
+                                                    onPress={(e) => {
+                                                        e.stopPropagation();
+                                                        handleNotificationAction(notif._id, 'accept');
+                                                    }}
+                                                >
+                                                    <Text style={{ color: '#fff', fontSize: 12 }}>Accept</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={{
+                                                        backgroundColor: '#DC3545',
+                                                        paddingVertical: 5,
+                                                        paddingHorizontal: 10,
+                                                        borderRadius: 6,
+                                                    }}
+                                                    onPress={(e) => {
+                                                        e.stopPropagation();
+                                                        handleNotificationAction(notif._id, 'reject');
+                                                    }}
+                                                >
+                                                    <Text style={{ color: '#fff', fontSize: 12 }}>Reject</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </TouchableOpacity>
+                                    ))
+                                )}
+                            </View>
+                        )}
+
+                        <TouchableOpacity
+                            style={styles.logoutButton}
+                            onPress={async () => {
+                                try {
+                                    const response = await fetch('http://192.168.1.99:5000/api/auth/logout', {
+                                        method: 'POST',
+                                        credentials: 'include',
+                                    });
+                                    const data = await response.json();
+                                    if (response.ok) {
+                                        navigation.replace('LoginScreen');
+                                    } else {
+                                        Alert.alert('Error', data.error || 'Logout failed');
+                                    }
+                                } catch (err) {
+                                    console.error(err);
+                                    Alert.alert('Error', 'Unable to connect to server.');
+                                }
+                            }}
+                        >
+                            <Text style={styles.logoutText}>Log Out</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
-            </View>
 
                 <ScrollView style={styles.scrollView}>
                     {items.length === 0 ? (
