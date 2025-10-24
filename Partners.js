@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,14 +11,37 @@ export default function Partners() {
     const [activeTab, setActiveTab] = useState('partners');
     const [currentUserId, setCurrentUserId] = useState(null);
     const [users, setUsers] = useState([]);
+    const [notifications, setNotifications] = useState([]);
+    const [dropdownVisible, setDropdownVisible] = useState(false);
+    const [currentUsername, setCurrentUsername] = useState('');
+    const [modalVisible, setModalVisible] = useState(false);
 
     useEffect(() => {
-        const loadUserId = async () => {
+        const loadUserData = async () => {
             const id = await AsyncStorage.getItem('userId');
+            const username = await AsyncStorage.getItem('username');
+
             setCurrentUserId(id);
+            setCurrentUsername(username);
         };
-        loadUserId();
+        loadUserData();
     }, []);
+
+    const fetchNotifications = async () => {
+        if (!currentUserId) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`http://192.168.1.99:5000/api/notifications/${currentUserId}`);
+
+            const data = await response.json();
+
+            setNotifications(data);
+        } catch (err) {
+            console.error('❌ Error fetching notifications:', err);
+        }
+    };
 
     useEffect(() => {
         const fetchUsers = async () => {
@@ -27,7 +50,7 @@ export default function Partners() {
                 const data = await response.json();
                 setUsers(data.users);
             } catch (err) {
-                console.error(err);
+                console.error('❌ Error fetching users:', err);
             }
         };
 
@@ -36,6 +59,72 @@ export default function Partners() {
         }
     }, [currentUserId]);
 
+    useEffect(() => {
+        if (currentUserId) {
+            fetchNotifications();
+        }
+    }, [currentUserId]);
+
+    const handleNotificationAction = async (notificationId, action) => {
+        try {
+            if (action === 'accept') {
+                await fetch(`http://192.168.1.99:5000/api/notifications/${notificationId}/accept`, {
+                    method: 'PUT',
+                });
+
+                alert('Trader request accepted!');
+            } else if (action === 'reject') {
+                await fetch(`http://192.168.1.99:5000/api/notifications/${notificationId}`, {
+                    method: 'DELETE',
+                });
+
+                alert('Trader request rejected.');
+            }
+
+            await fetchNotifications();
+        } catch (error) {
+            console.error('Error handling notification:', error);
+            alert('Failed to process notification.');
+        }
+    };
+
+    const sendNotification = async (receiverId, receiverUsername) => {
+        if (!currentUserId || !currentUsername) {
+            Alert.alert("Error", "User info not loaded yet. Please wait a moment.");
+            return;
+        }
+
+        const notificationData = {
+            senderId: currentUserId,
+            receiverId: receiverId,
+            message: `${currentUsername} wants to add you as a trader.`,
+        };
+
+        try {
+            const res = await fetch("http://192.168.1.99:5000/api/notifications", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(notificationData),
+            });
+
+            const data = await res.json();
+            console.log("🔵 Response data:", data);
+
+            if (res.ok) {
+                Alert.alert("Success", "Trader request sent!");
+                await fetchNotifications();
+            } else {
+                Alert.alert("Error", data.error || "Failed to send request.");
+            }
+        } catch (error) {
+            console.error("❌ Network error:", error);
+            console.error("❌ Error details:", error.message);
+            Alert.alert("Error", "Unable to connect to the server. Check console for details.");
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.appWrapper}>
@@ -43,28 +132,118 @@ export default function Partners() {
                     <Text style={styles.navTitle}>Home</Text>
 
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        {/* Profile Icon */}
                         <TouchableOpacity style={{ marginRight: 20 }} onPress={() => console.log('Profile pressed')}>
                             <Ionicons name="person-circle-outline" size={28} color="#fff" />
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={{ marginRight: 20 }} onPress={() => console.log('Notifications pressed')}>
+                        <TouchableOpacity
+                            style={{ marginRight: 20 }}
+                            onPress={() => {
+                                if (!dropdownVisible) {
+                                    fetchNotifications();
+                                }
+                                setDropdownVisible(!dropdownVisible);
+                            }}
+                        >
                             <Ionicons name="notifications-outline" size={26} color="#fff" />
-                            {/* Optional badge for unread notifications */}
+                            {notifications.some(n => !n.isRead) && (
+                                <View
+                                    style={{
+                                        position: 'absolute',
+                                        right: 10,
+                                        top: 2,
+                                        backgroundColor: 'red',
+                                        borderRadius: 8,
+                                        width: 10,
+                                        height: 10,
+                                    }}
+                                />
+                            )}
+                        </TouchableOpacity>
+
+                        {dropdownVisible && (
                             <View
                                 style={{
                                     position: 'absolute',
+                                    top: 60,
                                     right: 10,
-                                    top: 2,
-                                    backgroundColor: 'red',
-                                    borderRadius: 8,
-                                    width: 10,
-                                    height: 10,
+                                    backgroundColor: '#1C1C3A',
+                                    borderRadius: 12,
+                                    padding: 10,
+                                    shadowColor: '#000',
+                                    shadowOpacity: 0.3,
+                                    shadowRadius: 6,
+                                    width: 280,
+                                    maxHeight: 400,
+                                    zIndex: 999,
                                 }}
-                            />
-                        </TouchableOpacity>
+                            >
+                                {notifications.length === 0 ? (
+                                    <Text style={{ color: '#fff', textAlign: 'center', paddingVertical: 10 }}>
+                                        No notifications
+                                    </Text>
+                                ) : (
+                                    notifications.map((notif, index) => (
+                                        <TouchableOpacity
+                                            key={notif._id || index}
+                                            activeOpacity={0.8}
+                                            style={{
+                                                backgroundColor: notif.isRead ? '#1E1E3A' : '#2E2E50',
+                                                borderRadius: 8,
+                                                padding: 10,
+                                                marginBottom: 10,
+                                                borderLeftWidth: 3,
+                                                borderLeftColor: notif.isRead ? '#444' : '#6C63FF',
+                                            }}
+                                            onPress={() => {
+                                                if (!notif.isRead) {
+                                                    fetch(`http://192.168.1.99:5000/api/notifications/${notif._id}/read`, {
+                                                        method: 'PUT',
+                                                    }).then(() => {
+                                                        fetchNotifications();
+                                                    });
+                                                }
+                                            }}
+                                        >
+                                            <Text style={{ color: '#fff', fontSize: 14, marginBottom: 8 }}>
+                                                {notif.message}
+                                            </Text>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+                                                <TouchableOpacity
+                                                    style={{
+                                                        backgroundColor: '#28A745',
+                                                        paddingVertical: 5,
+                                                        paddingHorizontal: 10,
+                                                        borderRadius: 6,
+                                                    }}
+                                                    onPress={(e) => {
+                                                        e.stopPropagation();
+                                                        handleNotificationAction(notif._id, 'accept');
+                                                    }}
+                                                >
+                                                    <Text style={{ color: '#fff', fontSize: 12 }}>Accept</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={{
+                                                        backgroundColor: '#DC3545',
+                                                        paddingVertical: 5,
+                                                        paddingHorizontal: 10,
+                                                        borderRadius: 6,
+                                                    }}
+                                                    onPress={(e) => {
+                                                        e.stopPropagation();
+                                                        handleNotificationAction(notif._id, 'reject');
+                                                    }}
+                                                >
+                                                    <Text style={{ color: '#fff', fontSize: 12 }}>Reject</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </TouchableOpacity>
+                                    ))
+                                )}
+                            </View>
+                        )}
 
-                        {/* Log Out Button */}
                         <TouchableOpacity
                             style={styles.logoutButton}
                             onPress={async () => {
@@ -77,11 +256,11 @@ export default function Partners() {
                                     if (response.ok) {
                                         navigation.replace('LoginScreen');
                                     } else {
-                                        alert(data.error || 'Logout failed');
+                                        Alert.alert('Error', data.error || 'Logout failed');
                                     }
                                 } catch (err) {
                                     console.error(err);
-                                    alert('Unable to connect to server.');
+                                    Alert.alert('Error', 'Unable to connect to server.');
                                 }
                             }}
                         >
@@ -90,7 +269,7 @@ export default function Partners() {
                     </View>
                 </View>
 
-                {/* Users List */}
+
                 <ScrollView style={[styles.scrollView, { marginTop: 20 }]}>
                     {users.length === 0 ? (
                         <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
@@ -108,6 +287,7 @@ export default function Partners() {
                                     marginBottom: 10,
                                     position: 'relative',
                                 }}
+                                pointerEvents="box-none"
                             >
                                 <Text style={{ color: '#FFD700', fontWeight: 'bold', fontSize: 16 }}>
                                     {user.username}
@@ -116,18 +296,19 @@ export default function Partners() {
                                     {user.email}
                                 </Text>
 
-                                {/* Add Trader Button for each user */}
                                 <TouchableOpacity
                                     style={{
                                         position: 'absolute',
                                         bottom: 10,
-                                        right: 15, 
+                                        right: 15,
                                         backgroundColor: '#1E90FF',
                                         paddingVertical: 8,
                                         paddingHorizontal: 14,
                                         borderRadius: 10,
                                     }}
-                                    onPress={() => console.log('Add Trader for', user.username)}
+                                    onPress={() => {
+                                        sendNotification(user._id, user.username);
+                                    }}
                                 >
                                     <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 12 }}>
                                         Add Trader

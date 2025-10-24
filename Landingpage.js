@@ -52,6 +52,8 @@ export default function Landingpage() {
 
             if (response.ok) {
                 await AsyncStorage.setItem('userId', data.user._id);
+                await AsyncStorage.setItem('username', data.user.username);
+                await AsyncStorage.setItem('email', data.user.email);
 
                 navigation.replace('Homepage');
             } else {
