@@ -4,16 +4,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function Partners() {
+export default function Trade() {
     const navigation = useNavigation();
     const route = useRoute();
     const currentRoute = route.name;
-    const [activeTab, setActiveTab] = useState('partners');
+    const [activeTab, setActiveTab] = useState('TradesScreen');
     const [currentUserId, setCurrentUserId] = useState(null);
     const [users, setUsers] = useState([]);
     const [notifications, setNotifications] = useState([]);
     const [dropdownVisible, setDropdownVisible] = useState(false);
     const [currentUsername, setCurrentUsername] = useState('');
+    const [modalVisible, setModalVisible] = useState(false);
     const [messagesDropdownVisible, setMessagesDropdownVisible] = useState(false);
     const [tradeNotifications, setTradeNotifications] = useState([]);
 
@@ -89,44 +90,9 @@ export default function Partners() {
         }
     };
 
-    const sendNotification = async (receiverId, receiverUsername) => {
-        if (!currentUserId || !currentUsername) {
-            Alert.alert("Error", "User info not loaded yet. Please wait a moment.");
-            return;
-        }
-
-        const notificationData = {
-            senderId: currentUserId,
-            receiverId: receiverId,
-            message: `${currentUsername} wants to add you as a trader.`,
-        };
-
-        try {
-            const res = await fetch("http://192.168.1.99:5000/api/notifications", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(notificationData),
-            });
-
-            const data = await res.json();
-
-            if (res.ok) {
-                Alert.alert("Success", "Trader request sent!");
-                await fetchNotifications();
-            } else {
-                Alert.alert("Error", data.error || "Failed to send request.");
-            }
-        } catch (error) {
-            console.error("Network error:", error);
-            console.error("Error details:", error.message);
-            Alert.alert("Error", "Unable to connect to the server. Check console for details.");
-        }
-    };
-
     const fetchTradeNotifications = async () => {
         if (!currentUserId) {
+            console.warn('currentUserId is null, skipping fetch');
             return;
         }
 
@@ -160,7 +126,7 @@ export default function Partners() {
         <SafeAreaView style={styles.container}>
             <View style={styles.appWrapper}>
                 <View style={styles.navbar}>
-                    <Text style={styles.navTitle}>Partners</Text>
+                    <Text style={styles.navTitle}>Trades</Text>
 
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         {/* Profile Icon */}
@@ -388,52 +354,7 @@ export default function Partners() {
                 </View>
 
                 <ScrollView style={[styles.scrollView, { marginTop: 20 }]}>
-                    {users.length === 0 ? (
-                        <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
-                            No partners found.
-                        </Text>
-                    ) : (
-                        users.map(user => (
-                            <View
-                                key={user._id}
-                                style={{
-                                    backgroundColor: '#1C1C3A',
-                                    padding: 15,
-                                    paddingBottom: 50,
-                                    borderRadius: 8,
-                                    marginBottom: 10,
-                                    position: 'relative',
-                                }}
-                                pointerEvents="box-none"
-                            >
-                                <Text style={{ color: '#FFD700', fontWeight: 'bold', fontSize: 16 }}>
-                                    {user.username}
-                                </Text>
-                                <Text style={{ color: '#fff', marginTop: 4, fontSize: 14, marginBottom: 10 }}>
-                                    {user.email}
-                                </Text>
 
-                                <TouchableOpacity
-                                    style={{
-                                        position: 'absolute',
-                                        bottom: 10,
-                                        right: 15,
-                                        backgroundColor: '#1E90FF',
-                                        paddingVertical: 8,
-                                        paddingHorizontal: 14,
-                                        borderRadius: 10,
-                                    }}
-                                    onPress={() => {
-                                        sendNotification(user._id, user.username);
-                                    }}
-                                >
-                                    <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 12 }}>
-                                        Add Trader
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        ))
-                    )}
                 </ScrollView>
 
                 <View style={styles.footer}>
@@ -458,21 +379,18 @@ export default function Partners() {
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.menuItem, activeTab === 'trades' && styles.activeMenuItem]}
-                            onPress={() => {
-                                setActiveTab('trades');
-                                navigation.navigate('TradesScreen');
-                            }}
+                            style={[styles.menuItem, currentRoute === 'TradesScreen' && styles.activeMenuItem]}
+                            onPress={() => navigation.navigate('TradesScreen')}
                         >
                             <Ionicons
-                                name={activeTab === 'trades' ? 'swap-horizontal' : 'swap-horizontal-outline'}
+                                name={currentRoute === 'TradesScreen' ? 'swap-horizontal' : 'swap-horizontal-outline'}
                                 size={24}
-                                color={activeTab === 'trades' ? '#FFD700' : '#fff'}
+                                color={currentRoute === 'TradesScreen' ? '#FFD700' : '#fff'}
                             />
                             <Text
                                 style={[
                                     styles.menuText,
-                                    activeTab === 'trades' && styles.activeMenuText
+                                    currentRoute === 'TradesScreen' && styles.activeMenuText
                                 ]}
                             >
                                 Trades
