@@ -243,9 +243,21 @@ export default function Partners() {
                                                             await fetch(`http://192.168.1.99:5000/api/trades/${notif.tradeId}/accept`, { method: 'PUT' });
                                                             Alert.alert('Success', 'Trade accepted!');
                                                             fetchTradeNotifications();
-                                                            setMessagesDropdownVisible(false); // optionally close dropdown
-                                                            navigation.navigate('MessagesScreen'); // redirect to Messages page
+                                                            setMessagesDropdownVisible(false);
+
+                                                            if (notif.sender && notif.sender._id) {
+                                                                navigation.navigate('MessagesScreen', {
+                                                                    selectedUser: {
+                                                                        _id: notif.sender._id,
+                                                                        username: notif.sender.username || 'Unknown User'
+                                                                    }
+                                                                });
+                                                            } else {
+                                                                console.error('Sender data missing:', notif);
+                                                                Alert.alert('Error', 'Unable to open chat - sender information missing');
+                                                            }
                                                         } catch (err) {
+                                                            console.error('Accept trade error:', err);
                                                             Alert.alert('Error', 'Failed to accept trade');
                                                         }
                                                     }}

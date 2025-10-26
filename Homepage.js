@@ -126,7 +126,7 @@ export default function Homepage() {
                 if (response.ok) {
                     setItems(data.items);
                 } else {
-                    console.log(data.error || 'Failed to load items');
+                    return;
                 }
             } catch (err) {
                 console.error('Error fetching items:', err);
@@ -317,9 +317,21 @@ export default function Homepage() {
                                                             await fetch(`http://192.168.1.99:5000/api/trades/${notif.tradeId}/accept`, { method: 'PUT' });
                                                             Alert.alert('Success', 'Trade accepted!');
                                                             fetchTradeNotifications();
-                                                            setMessagesDropdownVisible(false); // optionally close dropdown
-                                                            navigation.navigate('MessagesScreen'); // redirect to Messages page
+                                                            setMessagesDropdownVisible(false);
+
+                                                            if (notif.sender && notif.sender._id) {
+                                                                navigation.navigate('MessagesScreen', {
+                                                                    selectedUser: {
+                                                                        _id: notif.sender._id,
+                                                                        username: notif.sender.username || 'Unknown User'
+                                                                    }
+                                                                });
+                                                            } else {
+                                                                console.error('Sender data missing:', notif);
+                                                                Alert.alert('Error', 'Unable to open chat - sender information missing');
+                                                            }
                                                         } catch (err) {
+                                                            console.error('Accept trade error:', err);
                                                             Alert.alert('Error', 'Failed to accept trade');
                                                         }
                                                     }}
@@ -784,9 +796,34 @@ export default function Homepage() {
                                         const data = await response.json();
 
                                         if (response.ok) {
-                                            alert('Trade offer sent!');
-                                            setTradeModalVisible(false);
-                                            setSelectedTradeItem(null);
+                                            Alert.alert(
+                                                'Trade Offer Sent!',
+                                                'A message has been sent to the item owner.',
+                                                [
+                                                    {
+                                                        text: 'View Messages',
+                                                        onPress: () => {
+                                                            setTradeModalVisible(false);
+                                                            setSelectedTradeItem(null);
+
+                                                            // Navigate to messages with the target item owner
+                                                            navigation.navigate('MessagesScreen', {
+                                                                selectedUser: {
+                                                                    _id: tradeTargetItem.owner._id || tradeTargetItem.owner,
+                                                                    username: tradeTargetItem.owner.username || 'User'
+                                                                }
+                                                            });
+                                                        }
+                                                    },
+                                                    {
+                                                        text: 'OK',
+                                                        onPress: () => {
+                                                            setTradeModalVisible(false);
+                                                            setSelectedTradeItem(null);
+                                                        }
+                                                    }
+                                                ]
+                                            );
                                         } else {
                                             alert(data.error || 'Failed to send trade');
                                         }
