@@ -28,9 +28,7 @@ export default function Homepage() {
     const [tradeModalVisible, setTradeModalVisible] = useState(false);
     const [selectedTradeItem, setSelectedTradeItem] = useState(null);
     const [tradeTargetItem, setTradeTargetItem] = useState(null);
-    const [messagesDropdownVisible, setMessagesDropdownVisible] = useState(false);
     const [tradeNotifications, setTradeNotifications] = useState([]);
-    const [tradeDropdownVisible, setTradeDropdownVisible] = useState(false);
 
     const pickImage = async () => {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -182,9 +180,44 @@ export default function Homepage() {
         }
     };
 
+    const fetchTradeNotifications = async () => {
+        if (!currentUserId) return;
+
+        try {
+            const res = await fetch(`http://192.168.1.99:5000/api/trades/trades/${currentUserId}`);
+            if (!res.ok) return setTradeNotifications([]);
+            const data = await res.json();
+
+            setTradeNotifications([...data]);
+        } catch {
+            setTradeNotifications([]);
+        }
+    };
+
     useEffect(() => {
-        if (currentUserId) fetchNotifications();
+        if (currentUserId) {
+            fetchNotifications();
+            fetchTradeNotifications();
+        }
     }, [currentUserId]);
+
+    useEffect(() => {
+        if (!currentUserId) return;
+
+        const intervalId = setInterval(() => {
+            fetchNotifications();
+            fetchTradeNotifications();
+        }, 5000);
+
+        return () => clearInterval(intervalId);
+    }, [currentUserId]);
+
+    useEffect(() => {
+        if (dropdownVisible) {
+            setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+            setTradeNotifications(prev => prev.map(t => ({ ...t, isRead: true })));
+        }
+    }, [dropdownVisible]);
 
     const handleNotificationAction = async (notificationId, action) => {
         try {
@@ -202,51 +235,12 @@ export default function Homepage() {
         }
     };
 
-    const fetchTradeNotifications = async () => {
-        if (!currentUserId) return;
+    const allNotifications = [
+        ...notifications.map(n => ({ ...n, notifType: 'friend_request' })),
+        ...tradeNotifications.map(t => ({ ...t, notifType: 'trade_offer' }))
+    ];
 
-        try {
-            const res = await fetch(`http://192.168.1.99:5000/api/trades/trades/${currentUserId}`);
-            if (!res.ok) return setTradeNotifications([]);
-            const data = await res.json();
-
-            setTradeNotifications([...data]);
-        } catch {
-            setTradeNotifications([]);
-        }
-    };
-
-    useEffect(() => {
-        if (tradeDropdownVisible) {
-            setTradeNotifications(prev => prev.map(t => ({ ...t, isRead: true })));
-        }
-    }, [tradeDropdownVisible]);
-
-    useEffect(() => {
-        if (!currentUserId) return;
-
-        fetchTradeNotifications();
-
-        const intervalId = setInterval(() => {
-            fetchTradeNotifications();
-        }, 5000);
-
-        return () => clearInterval(intervalId);
-    }, [currentUserId]);
-
-    useEffect(() => {
-        const loadUserData = async () => {
-            let id = await AsyncStorage.getItem('userId');
-            let username = await AsyncStorage.getItem('username');
-
-            if (!id) return;
-            id = id.replace(/"/g, '');
-            setCurrentUserId(id);
-            setCurrentUsername(username);
-        };
-
-        loadUserData();
-    }, []);
+    const hasUnreadNotifications = allNotifications.some(n => !n.isRead);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -260,17 +254,19 @@ export default function Homepage() {
                             <Ionicons name="person-circle-outline" size={28} color="#fff" />
                         </TouchableOpacity>
 
-                        {/* 💬 Trade Offers Icon */}
+                        {/* Unified Notifications Icon */}
                         <TouchableOpacity
                             style={{ marginRight: 20, position: 'relative' }}
                             onPress={() => {
-                                setDropdownVisible(false);
-                                if (!tradeDropdownVisible) fetchTradeNotifications();
-                                setTradeDropdownVisible(!tradeDropdownVisible);
+                                if (!dropdownVisible) {
+                                    fetchNotifications();
+                                    fetchTradeNotifications();
+                                }
+                                setDropdownVisible(!dropdownVisible);
                             }}
                         >
-                            <Ionicons name="chatbubble-outline" size={26} color="#fff" />
-                            {tradeNotifications.some(t => !t.isRead) && !tradeDropdownVisible && (
+                            <Ionicons name="notifications-outline" size={26} color="#fff" />
+                            {hasUnreadNotifications && !dropdownVisible && (
                                 <View
                                     style={{
                                         position: 'absolute',
@@ -285,128 +281,7 @@ export default function Homepage() {
                             )}
                         </TouchableOpacity>
 
-                        {/* Trade Notifications Dropdown */}
-                        {tradeDropdownVisible && (
-                            <View
-                                style={{
-                                    position: 'absolute',
-                                    top: 50,
-                                    right: 0,
-                                    width: 280,
-                                    maxHeight: 400,
-                                    backgroundColor: '#1C1C3A',
-                                    borderRadius: 12,
-                                    padding: 10,
-                                    shadowColor: '#000',
-                                    shadowOpacity: 0.3,
-                                    shadowRadius: 6,
-                                    zIndex: 999,
-                                }}
-                            >
-                                {tradeNotifications.length === 0 ? (
-                                    <Text style={{ color: '#fff', textAlign: 'center', paddingVertical: 10 }}>
-                                        No trade offers
-                                    </Text>
-                                ) : (
-                                    tradeNotifications.map((notif, index) => (
-                                        <View
-                                            key={notif._id || index}
-                                            style={{
-                                                backgroundColor: notif.isRead ? '#1E1E3A' : '#2E2E50',
-                                                borderRadius: 8,
-                                                padding: 10,
-                                                marginBottom: 10,
-                                                borderLeftWidth: 3,
-                                                borderLeftColor: notif.isRead ? '#444' : '#1E90FF',
-                                            }}
-                                        >
-                                            <Text style={{ color: '#fff', fontSize: 14, marginBottom: 8 }}>
-                                                {notif.message}
-                                            </Text>
-                                            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
-                                                <TouchableOpacity
-                                                    style={{
-                                                        backgroundColor: '#28A745',
-                                                        paddingVertical: 5,
-                                                        paddingHorizontal: 10,
-                                                        borderRadius: 6,
-                                                    }}
-                                                    onPress={async () => {
-                                                        try {
-                                                            await fetch(`http://192.168.1.99:5000/api/trades/${notif.tradeId}/accept`, { method: 'PUT' });
-                                                            Alert.alert('Success', 'Trade accepted!');
-                                                            fetchTradeNotifications();
-                                                            setTradeDropdownVisible(false);
-
-                                                            if (notif.sender && notif.sender._id) {
-                                                                navigation.navigate('MessagesScreen', {
-                                                                    selectedUser: {
-                                                                        _id: notif.sender._id,
-                                                                        username: notif.sender.username || 'Unknown User',
-                                                                    },
-                                                                });
-                                                            } else {
-                                                                Alert.alert('Error', 'Sender information missing');
-                                                            }
-                                                        } catch (err) {
-                                                            Alert.alert('Error', 'Failed to accept trade');
-                                                        }
-                                                    }}
-                                                >
-                                                    <Text style={{ color: '#fff', fontSize: 12 }}>Accept</Text>
-                                                </TouchableOpacity>
-
-                                                <TouchableOpacity
-                                                    style={{
-                                                        backgroundColor: '#DC3545',
-                                                        paddingVertical: 5,
-                                                        paddingHorizontal: 10,
-                                                        borderRadius: 6,
-                                                    }}
-                                                    onPress={async () => {
-                                                        try {
-                                                            await fetch(`http://192.168.1.99:5000/api/trades/${notif.tradeId}/reject`, { method: 'PUT' });
-                                                            Alert.alert('Success', 'Trade rejected');
-                                                            fetchTradeNotifications();
-                                                        } catch (err) {
-                                                            Alert.alert('Error', 'Failed to reject trade');
-                                                        }
-                                                    }}
-                                                >
-                                                    <Text style={{ color: '#fff', fontSize: 12 }}>Reject</Text>
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
-                                    ))
-                                )}
-                            </View>
-                        )}
-
-                        {/* Notifications Icon */}
-                        <TouchableOpacity
-                            style={{ marginRight: 20, position: 'relative' }}
-                            onPress={() => {
-                                if (!dropdownVisible) fetchNotifications();
-                                setDropdownVisible(!dropdownVisible);
-                            }}
-                        >
-                            <Ionicons name="notifications-outline" size={26} color="#fff" />
-                            {notifications.some(n => !n.isRead) && !dropdownVisible && (
-                                <View
-                                    style={{
-                                        position: 'absolute',
-                                        right: 10,
-                                        top: 2,
-                                        backgroundColor: 'red',
-                                        borderRadius: 8,
-                                        width: 10,
-                                        height: 10,
-                                    }}
-                                />
-                            )}
-                        </TouchableOpacity>
-
-                        {/* Notifications Dropdown */}
+                        {/* Unified Notifications Dropdown */}
                         {dropdownVisible && (
                             <View style={{
                                 position: 'absolute',
@@ -422,45 +297,93 @@ export default function Homepage() {
                                 maxHeight: 400,
                                 zIndex: 999,
                             }}>
-                                {notifications.length === 0 ? (
-                                    <Text style={{ color: '#fff', textAlign: 'center', paddingVertical: 10 }}>
-                                        No notifications
-                                    </Text>
-                                ) : (
-                                    notifications.map((notif, index) => (
-                                        <TouchableOpacity
-                                            key={notif._id || index}
-                                            activeOpacity={0.8}
-                                            style={{
-                                                backgroundColor: notif.isRead ? '#1E1E3A' : '#2E2E50',
-                                                borderRadius: 8,
-                                                padding: 10,
-                                                marginBottom: 10,
-                                                borderLeftWidth: 3,
-                                                borderLeftColor: notif.isRead ? '#444' : '#6C63FF',
-                                            }}
-                                            onPress={() => setDropdownVisible(false)}
-                                        >
-                                            <Text style={{ color: '#fff', fontSize: 14, marginBottom: 8 }}>
-                                                {notif.message}
-                                            </Text>
-                                            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
-                                                <TouchableOpacity
-                                                    style={{ backgroundColor: '#28A745', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 6 }}
-                                                    onPress={(e) => { e.stopPropagation(); handleNotificationAction(notif._id, 'accept'); }}
-                                                >
-                                                    <Text style={{ color: '#fff', fontSize: 12 }}>Accept</Text>
-                                                </TouchableOpacity>
-                                                <TouchableOpacity
-                                                    style={{ backgroundColor: '#DC3545', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 6 }}
-                                                    onPress={(e) => { e.stopPropagation(); handleNotificationAction(notif._id, 'reject'); }}
-                                                >
-                                                    <Text style={{ color: '#fff', fontSize: 12 }}>Reject</Text>
-                                                </TouchableOpacity>
+                                <ScrollView>
+                                    {allNotifications.length === 0 ? (
+                                        <Text style={{ color: '#fff', textAlign: 'center', paddingVertical: 10 }}>
+                                            No notifications
+                                        </Text>
+                                    ) : (
+                                        allNotifications.map((notif, index) => (
+                                            <View
+                                                key={notif._id || index}
+                                                style={{
+                                                    backgroundColor: notif.isRead ? '#1E1E3A' : '#2E2E50',
+                                                    borderRadius: 8,
+                                                    padding: 10,
+                                                    marginBottom: 10,
+                                                    borderLeftWidth: 3,
+                                                    borderLeftColor: notif.isRead ? '#444' : (notif.notifType === 'trade_offer' ? '#1E90FF' : '#6C63FF'),
+                                                }}
+                                            >
+                                                <Text style={{ color: '#fff', fontSize: 14, marginBottom: 8 }}>
+                                                    {notif.message}
+                                                </Text>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+                                                    {notif.notifType === 'friend_request' && (
+                                                        <>
+                                                            <TouchableOpacity
+                                                                style={{ backgroundColor: '#28A745', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 6 }}
+                                                                onPress={() => handleNotificationAction(notif._id, 'accept')}
+                                                            >
+                                                                <Text style={{ color: '#fff', fontSize: 12 }}>Accept</Text>
+                                                            </TouchableOpacity>
+                                                            <TouchableOpacity
+                                                                style={{ backgroundColor: '#DC3545', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 6 }}
+                                                                onPress={() => handleNotificationAction(notif._id, 'reject')}
+                                                            >
+                                                                <Text style={{ color: '#fff', fontSize: 12 }}>Reject</Text>
+                                                            </TouchableOpacity>
+                                                        </>
+                                                    )}
+                                                    {notif.notifType === 'trade_offer' && (
+                                                        <>
+                                                            <TouchableOpacity
+                                                                style={{ backgroundColor: '#28A745', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 6 }}
+                                                                onPress={async () => {
+                                                                    try {
+                                                                        await fetch(`http://192.168.1.99:5000/api/trades/${notif.tradeId}/accept`, { method: 'PUT' });
+                                                                        Alert.alert('Success', 'Trade accepted!');
+                                                                        fetchTradeNotifications();
+                                                                        setDropdownVisible(false);
+
+                                                                        if (notif.sender && notif.sender._id) {
+                                                                            navigation.navigate('MessagesScreen', {
+                                                                                selectedUser: {
+                                                                                    _id: notif.sender._id,
+                                                                                    username: notif.sender.username || 'Unknown User',
+                                                                                },
+                                                                            });
+                                                                        } else {
+                                                                            Alert.alert('Error', 'Sender information missing');
+                                                                        }
+                                                                    } catch (err) {
+                                                                        Alert.alert('Error', 'Failed to accept trade');
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Text style={{ color: '#fff', fontSize: 12 }}>Accept</Text>
+                                                            </TouchableOpacity>
+                                                            <TouchableOpacity
+                                                                style={{ backgroundColor: '#DC3545', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 6 }}
+                                                                onPress={async () => {
+                                                                    try {
+                                                                        await fetch(`http://192.168.1.99:5000/api/trades/${notif.tradeId}/reject`, { method: 'PUT' });
+                                                                        Alert.alert('Success', 'Trade rejected');
+                                                                        fetchTradeNotifications();
+                                                                    } catch (err) {
+                                                                        Alert.alert('Error', 'Failed to reject trade');
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Text style={{ color: '#fff', fontSize: 12 }}>Reject</Text>
+                                                            </TouchableOpacity>
+                                                        </>
+                                                    )}
+                                                </View>
                                             </View>
-                                        </TouchableOpacity>
-                                    ))
-                                )}
+                                        ))
+                                    )}
+                                </ScrollView>
                             </View>
                         )}
 

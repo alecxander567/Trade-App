@@ -15,7 +15,6 @@ export default function Trade() {
     const [dropdownVisible, setDropdownVisible] = useState(false);
     const [currentUsername, setCurrentUsername] = useState('');
     const [modalVisible, setModalVisible] = useState(false);
-    const [messagesDropdownVisible, setMessagesDropdownVisible] = useState(false);
     const [tradeNotifications, setTradeNotifications] = useState([]);
     const [conversations, setConversations] = useState([]);
 
@@ -31,18 +30,38 @@ export default function Trade() {
     }, []);
 
     const fetchNotifications = async () => {
-        if (!currentUserId) {
-            return;
-        }
-
+        if (!currentUserId) return;
         try {
-            const response = await fetch(`http://192.168.1.99:5000/api/notifications/${currentUserId}`);
-            const data = await response.json();
-            setNotifications(data);
+            const res = await fetch(`http://192.168.1.99:5000/api/notifications/${currentUserId}`);
+            const data = await res.json();
+
+            const friendRequests = data.filter(notif => notif.type === 'friend_request');
+            setNotifications(friendRequests);
         } catch (err) {
             console.error('Error fetching notifications:', err);
         }
     };
+
+    const fetchTradeNotifications = async () => {
+        if (!currentUserId) return;
+
+        try {
+            const res = await fetch(`http://192.168.1.99:5000/api/trades/trades/${currentUserId}`);
+            if (!res.ok) return setTradeNotifications([]);
+            const data = await res.json();
+
+            setTradeNotifications([...data]);
+        } catch {
+            setTradeNotifications([]);
+        }
+    };
+
+    useEffect(() => {
+        if (currentUserId) {
+            fetchNotifications();
+            fetchTradeNotifications();
+        }
+    }, [currentUserId]);
 
     useEffect(() => {
         const fetchUsers = async () => {
@@ -57,13 +76,6 @@ export default function Trade() {
 
         if (currentUserId) {
             fetchUsers();
-        }
-    }, [currentUserId]);
-
-    useEffect(() => {
-        if (currentUserId) {
-            fetchNotifications();
-            fetchConversations();
         }
     }, [currentUserId]);
 
@@ -82,46 +94,52 @@ export default function Trade() {
         }
     };
 
+    useEffect(() => {
+        if (currentUserId) {
+            fetchConversations();
+        }
+    }, [currentUserId]);
+
+    useEffect(() => {
+        if (!currentUserId) return;
+
+        const intervalId = setInterval(() => {
+            fetchNotifications();
+            fetchTradeNotifications();
+        }, 5000);
+
+        return () => clearInterval(intervalId);
+    }, [currentUserId]);
+
+    useEffect(() => {
+        if (dropdownVisible) {
+            setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+            setTradeNotifications(prev => prev.map(t => ({ ...t, isRead: true })));
+        }
+    }, [dropdownVisible]);
+
     const handleNotificationAction = async (notificationId, action) => {
         try {
             if (action === 'accept') {
-                await fetch(`http://192.168.1.99:5000/api/notifications/${notificationId}/accept`, {
-                    method: 'PUT',
-                });
-
-                alert('Trader request accepted!');
+                await fetch(`http://192.168.1.99:5000/api/notifications/${notificationId}/accept`, { method: 'PUT' });
+                Alert.alert('Success', 'Trader request accepted!');
             } else if (action === 'reject') {
-                await fetch(`http://192.168.1.99:5000/api/notifications/${notificationId}`, {
-                    method: 'DELETE',
-                });
-
-                alert('Trader request rejected.');
+                await fetch(`http://192.168.1.99:5000/api/notifications/${notificationId}`, { method: 'DELETE' });
+                Alert.alert('Success', 'Trader request rejected.');
             }
-
-            await fetchNotifications();
-        } catch (error) {
-            console.error('Error handling notification:', error);
-            alert('Failed to process notification.');
+            fetchNotifications();
+        } catch (err) {
+            console.error('Error handling notification:', err);
+            Alert.alert('Error', 'Failed to process notification.');
         }
     };
 
-    const fetchTradeNotifications = async () => {
-        if (!currentUserId) {
-            console.warn('currentUserId is null, skipping fetch');
-            return;
-        }
+    const allNotifications = [
+        ...notifications.map(n => ({ ...n, notifType: 'friend_request' })),
+        ...tradeNotifications.map(t => ({ ...t, notifType: 'trade_offer' }))
+    ];
 
-        const url = `http://192.168.1.99:5000/api/trades/trades/${currentUserId}`;
-
-        try {
-            const res = await fetch(url);
-            if (!res.ok) return setTradeNotifications([]);
-            const data = await res.json();
-            setTradeNotifications(data);
-        } catch {
-            setTradeNotifications([]);
-        }
-    };
+    const hasUnreadNotifications = allNotifications.some(n => !n.isRead);
 
     const formatTime = (timestamp) => {
         const date = new Date(timestamp);
@@ -189,133 +207,122 @@ export default function Trade() {
                             <Ionicons name="person-circle-outline" size={28} color="#fff" />
                         </TouchableOpacity>
 
+                        {/* Unified Notifications Icon */}
                         <TouchableOpacity
                             style={{ marginRight: 20, position: 'relative' }}
                             onPress={() => {
-                                if (!messagesDropdownVisible) fetchTradeNotifications();
-                                setMessagesDropdownVisible(!messagesDropdownVisible);
-                            }}
-                        >
-                            <Ionicons name="chatbubble-outline" size={26} color="#fff" />
-                            {tradeNotifications.some(n => !n.isRead) && !messagesDropdownVisible && (
-                                <View style={styles.notificationDot} />
-                            )}
-                        </TouchableOpacity>
-
-                        {/* Trade Notifications Dropdown */}
-                        {messagesDropdownVisible && (
-                            <View style={styles.dropdown}>
-                                {tradeNotifications.length === 0 ? (
-                                    <Text style={styles.emptyText}>
-                                        No trade offers
-                                    </Text>
-                                ) : (
-                                    tradeNotifications.map((notif, index) => (
-                                        <View key={notif._id || index} style={styles.notificationCard}>
-                                            <Text style={styles.notificationMessage}>
-                                                {notif.message}
-                                            </Text>
-                                            <View style={styles.notificationActions}>
-                                                <TouchableOpacity
-                                                    style={[styles.actionButton, styles.acceptButton]}
-                                                    onPress={async () => {
-                                                        try {
-                                                            await fetch(`http://192.168.1.99:5000/api/trades/${notif.tradeId}/accept`, { method: 'PUT' });
-                                                            Alert.alert('Success', 'Trade accepted!');
-                                                            fetchTradeNotifications();
-                                                            setMessagesDropdownVisible(false);
-
-                                                            if (notif.sender && notif.sender._id) {
-                                                                navigation.navigate('MessagesScreen', {
-                                                                    selectedUser: {
-                                                                        _id: notif.sender._id,
-                                                                        username: notif.sender.username || 'Unknown User'
-                                                                    }
-                                                                });
-                                                            } else {
-                                                                Alert.alert('Error', 'Unable to open chat');
-                                                            }
-                                                        } catch (err) {
-                                                            Alert.alert('Error', 'Failed to accept trade');
-                                                        }
-                                                    }}
-                                                >
-                                                    <Text style={styles.actionButtonText}>Accept</Text>
-                                                </TouchableOpacity>
-
-                                                <TouchableOpacity
-                                                    style={[styles.actionButton, styles.rejectButton]}
-                                                    onPress={async () => {
-                                                        try {
-                                                            await fetch(`http://192.168.1.99:5000/api/trades/${notif.tradeId}/reject`, { method: 'PUT' });
-                                                            Alert.alert('Success', 'Trade rejected');
-                                                            fetchTradeNotifications();
-                                                        } catch (err) {
-                                                            Alert.alert('Error', 'Failed to reject trade');
-                                                        }
-                                                    }}
-                                                >
-                                                    <Text style={styles.actionButtonText}>Reject</Text>
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
-                                    ))
-                                )}
-                            </View>
-                        )}
-
-                        {/* Notifications Icon */}
-                        <TouchableOpacity
-                            style={{ marginRight: 20, position: 'relative' }}
-                            onPress={() => {
-                                if (!dropdownVisible) fetchNotifications();
+                                if (!dropdownVisible) {
+                                    fetchNotifications();
+                                    fetchTradeNotifications();
+                                }
                                 setDropdownVisible(!dropdownVisible);
                             }}
                         >
                             <Ionicons name="notifications-outline" size={26} color="#fff" />
-                            {notifications.some(n => !n.isRead) && !dropdownVisible && (
-                                <View style={styles.notificationDot2} />
+                            {hasUnreadNotifications && !dropdownVisible && (
+                                <View
+                                    style={{
+                                        position: 'absolute',
+                                        right: -2,
+                                        top: -2,
+                                        backgroundColor: 'red',
+                                        borderRadius: 8,
+                                        width: 10,
+                                        height: 10,
+                                    }}
+                                />
                             )}
                         </TouchableOpacity>
 
-                        {/* Notifications Dropdown */}
+                        {/* Unified Notifications Dropdown */}
                         {dropdownVisible && (
-                            <View style={styles.dropdown2}>
-                                {notifications.length === 0 ? (
-                                    <Text style={styles.emptyText}>
-                                        No notifications
-                                    </Text>
-                                ) : (
-                                    notifications.map((notif, index) => (
-                                        <TouchableOpacity
-                                            key={notif._id || index}
-                                            activeOpacity={0.8}
-                                            style={[
-                                                styles.notificationCard,
-                                                { borderLeftColor: notif.isRead ? '#444' : '#6C63FF' }
-                                            ]}
-                                            onPress={() => setDropdownVisible(false)}
-                                        >
-                                            <Text style={styles.notificationMessage}>
-                                                {notif.message}
-                                            </Text>
-                                            <View style={styles.notificationActions}>
-                                                <TouchableOpacity
-                                                    style={[styles.actionButton, styles.acceptButton]}
-                                                    onPress={(e) => { e.stopPropagation(); handleNotificationAction(notif._id, 'accept'); }}
-                                                >
-                                                    <Text style={styles.actionButtonText}>Accept</Text>
-                                                </TouchableOpacity>
-                                                <TouchableOpacity
-                                                    style={[styles.actionButton, styles.rejectButton]}
-                                                    onPress={(e) => { e.stopPropagation(); handleNotificationAction(notif._id, 'reject'); }}
-                                                >
-                                                    <Text style={styles.actionButtonText}>Reject</Text>
-                                                </TouchableOpacity>
+                            <View style={styles.dropdown}>
+                                <ScrollView>
+                                    {allNotifications.length === 0 ? (
+                                        <Text style={styles.emptyText}>
+                                            No notifications
+                                        </Text>
+                                    ) : (
+                                        allNotifications.map((notif, index) => (
+                                            <View
+                                                key={notif._id || index}
+                                                style={[
+                                                    styles.notificationCard,
+                                                    {
+                                                        backgroundColor: notif.isRead ? '#1E1E3A' : '#2E2E50',
+                                                        borderLeftColor: notif.isRead ? '#444' : (notif.notifType === 'trade_offer' ? '#1E90FF' : '#6C63FF'),
+                                                    }
+                                                ]}
+                                            >
+                                                <Text style={styles.notificationMessage}>
+                                                    {notif.message}
+                                                </Text>
+                                                <View style={styles.notificationActions}>
+                                                    {notif.notifType === 'friend_request' && (
+                                                        <>
+                                                            <TouchableOpacity
+                                                                style={[styles.actionButton, styles.acceptButton]}
+                                                                onPress={() => handleNotificationAction(notif._id, 'accept')}
+                                                            >
+                                                                <Text style={styles.actionButtonText}>Accept</Text>
+                                                            </TouchableOpacity>
+                                                            <TouchableOpacity
+                                                                style={[styles.actionButton, styles.rejectButton]}
+                                                                onPress={() => handleNotificationAction(notif._id, 'reject')}
+                                                            >
+                                                                <Text style={styles.actionButtonText}>Reject</Text>
+                                                            </TouchableOpacity>
+                                                        </>
+                                                    )}
+                                                    {notif.notifType === 'trade_offer' && (
+                                                        <>
+                                                            <TouchableOpacity
+                                                                style={[styles.actionButton, styles.acceptButton]}
+                                                                onPress={async () => {
+                                                                    try {
+                                                                        await fetch(`http://192.168.1.99:5000/api/trades/${notif.tradeId}/accept`, { method: 'PUT' });
+                                                                        Alert.alert('Success', 'Trade accepted!');
+                                                                        fetchTradeNotifications();
+                                                                        setDropdownVisible(false);
+
+                                                                        if (notif.sender && notif.sender._id) {
+                                                                            navigation.navigate('MessagesScreen', {
+                                                                                selectedUser: {
+                                                                                    _id: notif.sender._id,
+                                                                                    username: notif.sender.username || 'Unknown User'
+                                                                                }
+                                                                            });
+                                                                        } else {
+                                                                            Alert.alert('Error', 'Unable to open chat');
+                                                                        }
+                                                                    } catch (err) {
+                                                                        Alert.alert('Error', 'Failed to accept trade');
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Text style={styles.actionButtonText}>Accept</Text>
+                                                            </TouchableOpacity>
+                                                            <TouchableOpacity
+                                                                style={[styles.actionButton, styles.rejectButton]}
+                                                                onPress={async () => {
+                                                                    try {
+                                                                        await fetch(`http://192.168.1.99:5000/api/trades/${notif.tradeId}/reject`, { method: 'PUT' });
+                                                                        Alert.alert('Success', 'Trade rejected');
+                                                                        fetchTradeNotifications();
+                                                                    } catch (err) {
+                                                                        Alert.alert('Error', 'Failed to reject trade');
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Text style={styles.actionButtonText}>Reject</Text>
+                                                            </TouchableOpacity>
+                                                        </>
+                                                    )}
+                                                </View>
                                             </View>
-                                        </TouchableOpacity>
-                                    ))
-                                )}
+                                        ))
+                                    )}
+                                </ScrollView>
                             </View>
                         )}
 
@@ -580,39 +587,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         fontSize: 14,
     },
-    notificationDot: {
-        position: 'absolute',
-        top: -2,
-        right: -2,
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: 'red',
-    },
-    notificationDot2: {
-        position: 'absolute',
-        right: 10,
-        top: 2,
-        backgroundColor: 'red',
-        borderRadius: 8,
-        width: 10,
-        height: 10,
-    },
     dropdown: {
-        position: 'absolute',
-        top: 50,
-        right: 0,
-        width: 280,
-        maxHeight: 400,
-        backgroundColor: '#1C1C3A',
-        borderRadius: 12,
-        padding: 10,
-        shadowColor: '#000',
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
-        zIndex: 999,
-    },
-    dropdown2: {
         position: 'absolute',
         top: 60,
         right: 10,
@@ -632,12 +607,10 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
     },
     notificationCard: {
-        backgroundColor: '#2E2E50',
         borderRadius: 8,
         padding: 10,
         marginBottom: 10,
         borderLeftWidth: 3,
-        borderLeftColor: '#1E90FF',
     },
     notificationMessage: {
         color: '#fff',
