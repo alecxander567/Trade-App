@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback  } from "react-native";
 import io from "socket.io-client";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useNavigation} from "@react-navigation/native";
@@ -11,6 +11,7 @@ export default function Messages({ route }) {
     const [messages, setMessages] = useState([]);
     const [text, setText] = useState("");
     const socket = useRef(null);
+    const flatListRef = useRef();
 
     useEffect(() => {
         const loadCurrentUser = async () => {
@@ -77,6 +78,30 @@ export default function Messages({ route }) {
         }
     };
 
+    useEffect(() => {
+        if (flatListRef.current && messages.length > 0) {
+            setTimeout(() => {
+                flatListRef.current.scrollToEnd({ animated: true });
+            }, 0.5);
+        }
+    }, [messages]);
+
+    useEffect(() => {
+        const keyboardShowListener = Keyboard.addListener("keyboardDidShow", () => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+        });
+
+        const keyboardHideListener = Keyboard.addListener("keyboardDidHide", () => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+        });
+
+        return () => {
+            keyboardShowListener.remove();
+            keyboardHideListener.remove();
+        };
+    }, []);
+
+
     if (!selectedUser) {
         return (
             <View style={styles.container}>
@@ -96,47 +121,67 @@ export default function Messages({ route }) {
     }
 
     return (
-        <View style={styles.container}>
-            <View style={styles.topHeader}>
-                <Text style={styles.topHeaderText}>Messages</Text>
-                <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('Homepage')}>
-                    <Text style={styles.backText}>←</Text>
-                </TouchableOpacity>
-            </View>
+        <KeyboardAvoidingView
+            style={{ flex: 1, backgroundColor: "#0B0B1D" }}
+            behavior="height"
+        >
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <View style={{ flex: 1 }}>
+                    <View style={styles.topHeader}>
+                        <Text style={styles.topHeaderText}>Messages</Text>
+                        <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('Homepage')}>
+                            <Text style={styles.backText}>←</Text>
+                        </TouchableOpacity>
+                    </View>
 
-            <FlatList
-                data={messages}
-                keyExtractor={(item) => item._id || Math.random().toString()}
-                contentContainerStyle={{ paddingVertical: 10 }}
-                renderItem={({ item }) => (
-                    <View
-                        style={[
-                            styles.messageContainerModern,
-                            item.sender === currentUser._id
-                                ? styles.sentModern
-                                : styles.receivedModern,
-                        ]}
-                    >
-                        <Text style={item.sender === currentUser._id ? styles.sentText : styles.receivedText}>
-                            {item.text}
+                    {/* Display selected user’s username */}
+                    <View style={styles.chatUsernameWrapper}>
+                        <Text style={styles.chatUsernameText}>
+                            You're chatting with :{' '}
+                            <Text style={styles.chatUsernameName}>{selectedUser.username}</Text>
                         </Text>
                     </View>
-                )}
-            />
 
-            <View style={styles.inputWrapper}>
-                <TextInput
-                    style={styles.inputModern}
-                    value={text}
-                    onChangeText={setText}
-                    placeholder="Type a message..."
-                    placeholderTextColor="#999"
-                />
-                <TouchableOpacity style={styles.sendButtonModern} onPress={sendMessage}>
-                    <Text style={styles.sendTextModern}>➤</Text>
-                </TouchableOpacity>
-            </View>
-        </View>
+                    <FlatList
+                        ref={flatListRef}
+                        data={messages}
+                        keyExtractor={(item) => item._id || Math.random().toString()}
+                        contentContainerStyle={{ paddingBottom: 10 }}
+                        renderItem={({ item }) => (
+                            <View
+                                style={[
+                                    styles.messageContainerModern,
+                                    item.sender === currentUser._id
+                                        ? styles.sentModern
+                                        : styles.receivedModern,
+                                ]}
+                            >
+                                <Text style={item.sender === currentUser._id ? styles.sentText : styles.receivedText}>
+                                    {item.text}
+                                </Text>
+                            </View>
+                        )}
+                        showsVerticalScrollIndicator={true}
+                        persistentScrollbar={true}
+                        scrollEventThrottle={16}
+                        keyboardShouldPersistTaps="handled"
+                    />
+
+                    <View style={styles.inputWrapper}>
+                        <TextInput
+                            style={styles.inputModern}
+                            value={text}
+                            onChangeText={setText}
+                            placeholder="Type a message..."
+                            placeholderTextColor="#999"
+                        />
+                        <TouchableOpacity style={styles.sendButtonModern} onPress={sendMessage}>
+                            <Text style={styles.sendTextModern}>➤</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
     );
 }
 
@@ -225,10 +270,10 @@ const styles = StyleSheet.create({
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 10,
-        paddingVertical: 8,
+        paddingHorizontal: 15,
+        paddingVertical: 12,
         backgroundColor: '#1C1C3A',
-        borderRadius: 25,
+        borderRadius: 30,
         marginTop: 10,
         shadowColor: '#000',
         shadowOpacity: 0.2,
@@ -238,9 +283,9 @@ const styles = StyleSheet.create({
     },
     inputModern: {
         flex: 1,
-        paddingVertical: 10,
-        paddingHorizontal: 15,
-        borderRadius: 20,
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        borderRadius: 25,
         backgroundColor: '#2A2A40',
         color: '#fff',
         fontSize: 16,
@@ -265,9 +310,9 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     messageContainerModern: {
-        marginVertical: 5,
-        paddingVertical: 10,
-        paddingHorizontal: 15,
+        marginVertical: 8,
+        paddingVertical: 14,
+        paddingHorizontal: 20,
         borderRadius: 20,
         maxWidth: '75%',
         shadowColor: '#000',
@@ -279,7 +324,7 @@ const styles = StyleSheet.create({
     sentModern: {
         alignSelf: 'flex-end',
         backgroundColor: '#007AFF',
-        borderTopRightRadius: 5,
+        borderTopRightRadius: 10,
         borderTopLeftRadius: 20,
         borderBottomLeftRadius: 20,
         borderBottomRightRadius: 20,
@@ -287,7 +332,7 @@ const styles = StyleSheet.create({
     receivedModern: {
         alignSelf: 'flex-start',
         backgroundColor: '#2E2E50',
-        borderTopLeftRadius: 5,
+        borderTopLeftRadius: 10,
         borderTopRightRadius: 20,
         borderBottomLeftRadius: 20,
         borderBottomRightRadius: 20,
@@ -299,5 +344,21 @@ const styles = StyleSheet.create({
     receivedText: {
         color: '#fff',
         fontSize: 16,
+    },
+    chatUsernameWrapper: {
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        backgroundColor: '#1C1C3A',
+        borderRadius: 10,
+        marginBottom: 12,
+    },
+    chatUsernameText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    chatUsernameName: {
+        color: '#90EE90',
+        fontWeight: 'bold',
     },
 });

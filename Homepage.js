@@ -30,6 +30,7 @@ export default function Homepage() {
     const [tradeTargetItem, setTradeTargetItem] = useState(null);
     const [messagesDropdownVisible, setMessagesDropdownVisible] = useState(false);
     const [tradeNotifications, setTradeNotifications] = useState([]);
+    const [tradeDropdownVisible, setTradeDropdownVisible] = useState(false);
 
     const pickImage = async () => {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -173,7 +174,9 @@ export default function Homepage() {
         try {
             const res = await fetch(`http://192.168.1.99:5000/api/notifications/${currentUserId}`);
             const data = await res.json();
-            setNotifications(data);
+
+            const friendRequests = data.filter(notif => notif.type === 'friend_request');
+            setNotifications(friendRequests);
         } catch (err) {
             console.error('Error fetching notifications:', err);
         }
@@ -200,21 +203,36 @@ export default function Homepage() {
     };
 
     const fetchTradeNotifications = async () => {
-        if (!currentUserId) {
-            return;
-        }
-
-        const url = `http://192.168.1.99:5000/api/trades/trades/${currentUserId}`;
+        if (!currentUserId) return;
 
         try {
-            const res = await fetch(url);
+            const res = await fetch(`http://192.168.1.99:5000/api/trades/trades/${currentUserId}`);
             if (!res.ok) return setTradeNotifications([]);
             const data = await res.json();
-            setTradeNotifications(data);
+
+            setTradeNotifications([...data]);
         } catch {
             setTradeNotifications([]);
         }
     };
+
+    useEffect(() => {
+        if (tradeDropdownVisible) {
+            setTradeNotifications(prev => prev.map(t => ({ ...t, isRead: true })));
+        }
+    }, [tradeDropdownVisible]);
+
+    useEffect(() => {
+        if (!currentUserId) return;
+
+        fetchTradeNotifications();
+
+        const intervalId = setInterval(() => {
+            fetchTradeNotifications();
+        }, 5000);
+
+        return () => clearInterval(intervalId);
+    }, [currentUserId]);
 
     useEffect(() => {
         const loadUserData = async () => {
@@ -242,32 +260,33 @@ export default function Homepage() {
                             <Ionicons name="person-circle-outline" size={28} color="#fff" />
                         </TouchableOpacity>
 
+                        {/* 💬 Trade Offers Icon */}
                         <TouchableOpacity
                             style={{ marginRight: 20, position: 'relative' }}
                             onPress={() => {
-                                if (!messagesDropdownVisible) fetchTradeNotifications();
-                                setMessagesDropdownVisible(!messagesDropdownVisible);
+                                setDropdownVisible(false);
+                                if (!tradeDropdownVisible) fetchTradeNotifications();
+                                setTradeDropdownVisible(!tradeDropdownVisible);
                             }}
                         >
                             <Ionicons name="chatbubble-outline" size={26} color="#fff" />
-                            {/* Red dot for unread notifications */}
-                            {tradeNotifications.some(n => !n.isRead) && !messagesDropdownVisible && (
+                            {tradeNotifications.some(t => !t.isRead) && !tradeDropdownVisible && (
                                 <View
                                     style={{
                                         position: 'absolute',
-                                        top: -2,
                                         right: -2,
+                                        top: -2,
+                                        backgroundColor: 'red',
+                                        borderRadius: 8,
                                         width: 10,
                                         height: 10,
-                                        borderRadius: 5,
-                                        backgroundColor: 'red',
                                     }}
                                 />
                             )}
                         </TouchableOpacity>
 
                         {/* Trade Notifications Dropdown */}
-                        {messagesDropdownVisible && (
+                        {tradeDropdownVisible && (
                             <View
                                 style={{
                                     position: 'absolute',
@@ -317,21 +336,19 @@ export default function Homepage() {
                                                             await fetch(`http://192.168.1.99:5000/api/trades/${notif.tradeId}/accept`, { method: 'PUT' });
                                                             Alert.alert('Success', 'Trade accepted!');
                                                             fetchTradeNotifications();
-                                                            setMessagesDropdownVisible(false);
+                                                            setTradeDropdownVisible(false);
 
                                                             if (notif.sender && notif.sender._id) {
                                                                 navigation.navigate('MessagesScreen', {
                                                                     selectedUser: {
                                                                         _id: notif.sender._id,
-                                                                        username: notif.sender.username || 'Unknown User'
-                                                                    }
+                                                                        username: notif.sender.username || 'Unknown User',
+                                                                    },
                                                                 });
                                                             } else {
-                                                                console.error('Sender data missing:', notif);
-                                                                Alert.alert('Error', 'Unable to open chat - sender information missing');
+                                                                Alert.alert('Error', 'Sender information missing');
                                                             }
                                                         } catch (err) {
-                                                            console.error('Accept trade error:', err);
                                                             Alert.alert('Error', 'Failed to accept trade');
                                                         }
                                                     }}
@@ -494,7 +511,6 @@ export default function Homepage() {
                                     elevation: 8,
                                 }}
                             >
-                                {/* Image */}
                                 {item.image && (
                                     <Image
                                         source={{ uri: `http://192.168.1.99:5000${item.image}` }}
@@ -508,7 +524,6 @@ export default function Homepage() {
                                     />
                                 )}
 
-                                {/* Posted By */}
                                 <Text
                                     style={{
                                         color: '#aaa',
@@ -543,7 +558,6 @@ export default function Homepage() {
                                         <Ionicons name="ellipsis-vertical" size={20} color="#fff" />
                                     </TouchableOpacity>
 
-                                    {/* Popup Menu */}
                                     {menuVisible === index && (
                                         <View
                                             style={{
@@ -614,7 +628,6 @@ export default function Homepage() {
                                     )}
                                 </View>
 
-                                {/* Description */}
                                 <Text
                                     style={{
                                         color: '#D8BFD8',
@@ -625,7 +638,6 @@ export default function Homepage() {
                                     {item.description}
                                 </Text>
 
-                                {/* Date */}
                                 <Text
                                     style={{
                                         color: '#aaa',
@@ -642,7 +654,6 @@ export default function Homepage() {
                                     })}
                                 </Text>
 
-                                {/* Star + Trade Buttons */}
                                 <View
                                     style={{
                                         flexDirection: 'row',
@@ -691,7 +702,6 @@ export default function Homepage() {
                                         <Text style={{ color: '#fff', marginLeft: 6 }}>{item.stars || 0}</Text>
                                     </TouchableOpacity>
 
-                                    {/* Trade Buttons */}
                                     <View style={{ flexDirection: 'row' }}>
                                         <TouchableOpacity
                                             style={{
@@ -737,9 +747,7 @@ export default function Homepage() {
                             <ScrollView style={{ width: '100%', maxHeight: 300 }}>
                                 {items
                                     .filter(item => {
-                                        // Only show items owned by current user
                                         const isMyItem = item.owner === currentUserId || item.owner?._id === currentUserId;
-                                        // Don't show the target item itself
                                         const isNotTargetItem = item._id !== tradeTargetItem?._id;
                                         return isMyItem && isNotTargetItem;
                                     })
@@ -759,7 +767,6 @@ export default function Homepage() {
                                         </TouchableOpacity>
                                     ))}
 
-                                {/* Show message if no items available */}
                                 {items.filter(item => {
                                     const isMyItem = item.owner === currentUserId || item.owner?._id === currentUserId;
                                     const isNotTargetItem = item._id !== tradeTargetItem?._id;
@@ -806,7 +813,6 @@ export default function Homepage() {
                                                             setTradeModalVisible(false);
                                                             setSelectedTradeItem(null);
 
-                                                            // Navigate to messages with the target item owner
                                                             navigation.navigate('MessagesScreen', {
                                                                 selectedUser: {
                                                                     _id: tradeTargetItem.owner._id || tradeTargetItem.owner,
@@ -939,8 +945,6 @@ export default function Homepage() {
                 </View>
             </View>
 
-
-            {/* Modal */}
             <Modal
                 visible={modalVisible}
                 transparent
@@ -969,7 +973,6 @@ export default function Homepage() {
                                 <Ionicons name="image-outline" size={40} color="#aaa" />
                             )}
 
-                            {/* Overlay Text */}
                             <Text
                                 style={{
                                     position: 'absolute',
@@ -1015,7 +1018,6 @@ export default function Homepage() {
                 </View>
             </Modal>
 
-            {/* Edit Modal */}
             <Modal visible={editModalVisible} transparent={true} animationType="slide">
                 <View style={{
                     flex: 1,
@@ -1263,7 +1265,6 @@ const styles = StyleSheet.create({
         borderTopWidth: 2,
         borderTopColor: '#FFD700',
     },
-
     activeMenuText: {
         color: '#FFD700',
         fontWeight: 'bold',
