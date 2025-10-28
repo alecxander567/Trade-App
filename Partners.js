@@ -14,7 +14,6 @@ export default function Partners() {
     const [notifications, setNotifications] = useState([]);
     const [dropdownVisible, setDropdownVisible] = useState(false);
     const [currentUsername, setCurrentUsername] = useState('');
-    const [messagesDropdownVisible, setMessagesDropdownVisible] = useState(false);
     const [tradeNotifications, setTradeNotifications] = useState([]);
 
     useEffect(() => {
@@ -27,6 +26,12 @@ export default function Partners() {
         };
         loadUserData();
     }, []);
+
+    useEffect(() => {
+        if (currentUserId) {
+            fetchNotifications();
+        }
+    }, [currentUserId]);
 
     const fetchNotifications = async () => {
         if (!currentUserId) {
@@ -49,22 +54,34 @@ export default function Partners() {
             try {
                 const response = await fetch(`http://192.168.1.99:5000/api/users?exclude=${currentUserId}`);
                 const data = await response.json();
-                setUsers(data.users);
+
+                const updatedUsers = await Promise.all(data.users.map(async (user) => {
+                    const alreadyRequested = notifications.some(
+                        notif =>
+                            notif.senderId === currentUserId &&
+                            notif.receiverId === user._id &&
+                            notif.message.includes("wants to add you as a trader")
+                    );
+
+                    const key = `request_sent_${currentUserId}_${user._id}`;
+                    const storedRequest = await AsyncStorage.getItem(key);
+
+                    return {
+                        ...user,
+                        requestSent: alreadyRequested || storedRequest === 'true'
+                    };
+                }));
+
+                setUsers(updatedUsers);
             } catch (err) {
                 console.error('Error fetching users:', err);
             }
         };
 
-        if (currentUserId) {
+        if (currentUserId && notifications.length >= 0) {
             fetchUsers();
         }
-    }, [currentUserId]);
-
-    useEffect(() => {
-        if (currentUserId) {
-            fetchNotifications();
-        }
-    }, [currentUserId]);
+    }, [currentUserId, notifications]);
 
     const handleNotificationAction = async (notificationId, action) => {
         try {
@@ -82,7 +99,14 @@ export default function Partners() {
                 alert('Trader request rejected.');
             }
 
+            const notification = notifications.find(n => n._id === notificationId);
+            if (notification) {
+                const key = `request_sent_${notification.senderId}_${notification.receiverId}`;
+                await AsyncStorage.removeItem(key);
+            }
+
             await fetchNotifications();
+
         } catch (error) {
             console.error('Error handling notification:', error);
             alert('Failed to process notification.');
@@ -113,8 +137,16 @@ export default function Partners() {
             const data = await res.json();
 
             if (res.ok) {
+                setUsers(prevUsers =>
+                    prevUsers.map(u =>
+                        u._id === receiverId ? { ...u, requestSent: true } : u
+                    )
+                );
+                
+                const key = `request_sent_${currentUserId}_${receiverId}`;
+                await AsyncStorage.setItem(key, 'true');
+
                 Alert.alert("Success", "Trader request sent!");
-                await fetchNotifications();
             } else {
                 Alert.alert("Error", data.error || "Failed to send request.");
             }
@@ -124,37 +156,6 @@ export default function Partners() {
             Alert.alert("Error", "Unable to connect to the server. Check console for details.");
         }
     };
-
-    const fetchTradeNotifications = async () => {
-        if (!currentUserId) {
-            return;
-        }
-
-        const url = `http://192.168.1.99:5000/api/trades/trades/${currentUserId}`;
-
-        try {
-            const res = await fetch(url);
-            if (!res.ok) return setTradeNotifications([]);
-            const data = await res.json();
-            setTradeNotifications(data);
-        } catch {
-            setTradeNotifications([]);
-        }
-    };
-
-    useEffect(() => {
-        const loadUserData = async () => {
-            let id = await AsyncStorage.getItem('userId');
-            let username = await AsyncStorage.getItem('username');
-
-            if (!id) return;
-            id = id.replace(/"/g, '');
-            setCurrentUserId(id);
-            setCurrentUsername(username);
-        };
-
-        loadUserData();
-    }, []);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -238,10 +239,8 @@ export default function Partners() {
                                                         style={{ backgroundColor: '#28A745', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 6 }}
                                                         onPress={async (e) => {
                                                             e.stopPropagation();
-                                                            // Accept the notification first
                                                             await handleNotificationAction(notif._id, 'accept');
 
-                                                            // Then navigate to MessagesScreen with the sender info
                                                             if (notif.sender && notif.sender._id) {
                                                                 navigation.navigate('MessagesScreen', {
                                                                     selectedUser: {
@@ -372,21 +371,21 @@ export default function Partners() {
                                 </Text>
 
                                 <TouchableOpacity
+                                    disabled={user.requestSent}
                                     style={{
                                         position: 'absolute',
                                         bottom: 10,
                                         right: 15,
-                                        backgroundColor: '#1E90FF',
+                                        backgroundColor: user.requestSent ? '#555' : '#1E90FF',
                                         paddingVertical: 8,
                                         paddingHorizontal: 14,
                                         borderRadius: 10,
+                                        opacity: user.requestSent ? 0.6 : 1,
                                     }}
-                                    onPress={() => {
-                                        sendNotification(user._id, user.username);
-                                    }}
+                                    onPress={() => sendNotification(user._id, user.username)}
                                 >
                                     <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 12 }}>
-                                        Add Trader
+                                        {user.requestSent ? 'Request Sent' : 'Add Trader'}
                                     </Text>
                                 </TouchableOpacity>
                             </View>

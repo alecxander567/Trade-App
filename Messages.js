@@ -23,23 +23,35 @@ export default function Messages({ route }) {
     }, []);
 
     useEffect(() => {
-        if (!currentUser || !selectedUser) return;
+        if (currentUser && selectedUser) {
+            socket.current.emit("register", currentUser._id);
 
+            const handleReceive = (message) => {
+                if (
+                    (message.sender === selectedUser._id && message.receiver === currentUser._id) ||
+                    (message.sender === currentUser._id && message.receiver === selectedUser._id)
+                ) {
+                    setMessages(prev => [...prev, message]);
+                }
+            };
+
+            socket.current.on("receiveMessage", handleReceive);
+
+            fetchMessages();
+
+            return () => {
+                socket.current.off("receiveMessage", handleReceive);
+            };
+        }
+    }, [currentUser, selectedUser]);
+
+    useEffect(() => {
         socket.current = io("http://192.168.1.99:5000");
-        socket.current.emit("register", currentUser._id);
-
-        socket.current.on("receiveMessage", (message) => {
-            if (message.sender === selectedUser._id) {
-                setMessages((prev) => [...prev, message]);
-            }
-        });
-
-        fetchMessages();
 
         return () => {
             socket.current?.disconnect();
         };
-    }, [currentUser, selectedUser]);
+    }, []);
 
     const fetchMessages = async () => {
         if (!currentUser || !selectedUser) return;
@@ -80,9 +92,7 @@ export default function Messages({ route }) {
 
     useEffect(() => {
         if (flatListRef.current && messages.length > 0) {
-            setTimeout(() => {
-                flatListRef.current.scrollToEnd({ animated: true });
-            }, 0.5);
+            setTimeout(() => flatListRef.current.scrollToEnd({ animated: true }), 0);
         }
     }, [messages]);
 
@@ -100,7 +110,6 @@ export default function Messages({ route }) {
             keyboardHideListener.remove();
         };
     }, []);
-
 
     if (!selectedUser) {
         return (
