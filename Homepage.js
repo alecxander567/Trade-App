@@ -687,21 +687,6 @@ export default function Homepage() {
 
                   <View style={{ flexDirection: 'row' }}>
                     <TouchableOpacity
-                      style={{
-                        backgroundColor: '#FFD700',
-                        paddingVertical: 10,
-                        paddingHorizontal: 16,
-                        borderRadius: 10,
-                        marginLeft: 10,
-                      }}
-                      onPress={() => console.log(`Trade Later pressed for ${item.name}`)}
-                    >
-                      <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>
-                        Trade Later
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
                       style={styles.offerTradeButton}
                       onPress={() => {
                         setTradeTargetItem(item);
