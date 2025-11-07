@@ -34,6 +34,14 @@ export default function Messages({ route }) {
   }, []);
 
   useEffect(() => {
+    socket.current = io('http://192.168.1.99:5000');
+
+    return () => {
+      socket.current?.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
     if (currentUser && selectedUser) {
       socket.current.emit('register', currentUser._id);
 
@@ -56,14 +64,6 @@ export default function Messages({ route }) {
     }
   }, [currentUser, selectedUser]);
 
-  useEffect(() => {
-    socket.current = io('http://192.168.1.99:5000');
-
-    return () => {
-      socket.current?.disconnect();
-    };
-  }, []);
-
   const fetchMessages = async () => {
     if (!currentUser || !selectedUser) return;
 
@@ -85,7 +85,17 @@ export default function Messages({ route }) {
       sender: currentUser._id,
       receiver: selectedUser._id,
       text,
+      _id: Date.now().toString(),
+      timestamp: new Date().toISOString(),
     };
+
+    setText('');
+
+    setMessages(prev => [...prev, message]);
+
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 50);
 
     socket.current?.emit('sendMessage', message);
 
@@ -95,34 +105,10 @@ export default function Messages({ route }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(message),
       });
-
-      setMessages(prev => [...prev, message]);
-      setText('');
     } catch (error) {
       console.error('Error sending message:', error);
     }
   };
-
-  useEffect(() => {
-    if (flatListRef.current && messages.length > 0) {
-      setTimeout(() => flatListRef.current.scrollToEnd({ animated: true }), 0);
-    }
-  }, [messages]);
-
-  useEffect(() => {
-    const keyboardShowListener = Keyboard.addListener('keyboardDidShow', () => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    });
-
-    const keyboardHideListener = Keyboard.addListener('keyboardDidHide', () => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    });
-
-    return () => {
-      keyboardShowListener.remove();
-      keyboardHideListener.remove();
-    };
-  }, []);
 
   if (!selectedUser) {
     return (
@@ -143,66 +129,81 @@ export default function Messages({ route }) {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#0B0B1D' }} behavior="height">
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={{ flex: 1 }}>
-          <View style={styles.topHeader}>
-            <Text style={styles.topHeaderText}>Messages</Text>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => navigation.navigate('Homepage')}
-            >
-              <Text style={styles.backText}>←</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Display selected user’s username */}
-          <View style={styles.chatUsernameWrapper}>
-            <Text style={styles.chatUsernameText}>
-              You're chatting with :{' '}
-              <Text style={styles.chatUsernameName}>{selectedUser.username}</Text>
-            </Text>
-          </View>
-
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            keyExtractor={item => item._id || Math.random().toString()}
-            contentContainerStyle={{ paddingBottom: 10 }}
-            renderItem={({ item }) => (
-              <View
-                style={[
-                  styles.messageContainerModern,
-                  item.sender === currentUser._id ? styles.sentModern : styles.receivedModern,
-                ]}
-              >
-                <Text
-                  style={item.sender === currentUser._id ? styles.sentText : styles.receivedText}
-                >
-                  {item.text}
-                </Text>
-              </View>
-            )}
-            showsVerticalScrollIndicator={true}
-            persistentScrollbar={true}
-            scrollEventThrottle={16}
-            keyboardShouldPersistTaps="handled"
-          />
-
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.inputModern}
-              value={text}
-              onChangeText={setText}
-              placeholder="Type a message..."
-              placeholderTextColor="#999"
-            />
-            <TouchableOpacity style={styles.sendButtonModern} onPress={sendMessage}>
-              <Text style={styles.sendTextModern}>➤</Text>
-            </TouchableOpacity>
-          </View>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <View style={styles.innerContainer}>
+        <View style={styles.topHeader}>
+          <Text style={styles.topHeaderText}>Messages</Text>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.navigate('Homepage')}
+          >
+            <Text style={styles.backText}>←</Text>
+          </TouchableOpacity>
         </View>
-      </TouchableWithoutFeedback>
+
+        {/* Display selected user's username */}
+        <View style={styles.chatUsernameWrapper}>
+          <Text style={styles.chatUsernameText}>
+            You're chatting with :{' '}
+            <Text style={styles.chatUsernameName}>{selectedUser.username}</Text>
+          </Text>
+        </View>
+
+        <FlatList
+          ref={flatListRef}
+          style={styles.messagesList}
+          data={messages}
+          keyExtractor={item => item._id || Math.random().toString()}
+          renderItem={({ item }) => (
+            <View
+              style={[
+                styles.messageContainerModern,
+                item.sender === currentUser._id ? styles.sentModern : styles.receivedModern,
+              ]}
+            >
+              <Text style={item.sender === currentUser._id ? styles.sentText : styles.receivedText}>
+                {item.text}
+              </Text>
+            </View>
+          )}
+          showsVerticalScrollIndicator={true}
+          scrollEventThrottle={16}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => {
+            setTimeout(() => {
+              flatListRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+          }}
+          onLayout={() => {
+            if (messages.length > 0) {
+              setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: false });
+              }, 100);
+            }
+          }}
+          maintainVisibleContentPosition={{
+            minIndexForVisible: 0,
+          }}
+          ListFooterComponent={<View style={{ height: 20 }} />}
+        />
+
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.inputModern}
+            value={text}
+            onChangeText={setText}
+            placeholder="Type a message..."
+            placeholderTextColor="#999"
+          />
+          <TouchableOpacity style={styles.sendButtonModern} onPress={sendMessage}>
+            <Text style={styles.sendTextModern}>➤</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -210,61 +211,11 @@ export default function Messages({ route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 10,
     backgroundColor: '#0B0B1D',
   },
-  header: {
-    padding: 15,
-    backgroundColor: '#1C1C3A',
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  headerText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  messageContainer: {
-    marginVertical: 5,
-    padding: 10,
-    borderRadius: 10,
-    maxWidth: '80%',
-  },
-  sent: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#007AFF',
-  },
-  received: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#E5E5EA',
-  },
-  text: {
-    color: '#fff',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    marginTop: 10,
-    alignItems: 'center',
-  },
-  input: {
+  innerContainer: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#444',
-    borderRadius: 20,
     padding: 10,
-    color: '#fff',
-    backgroundColor: '#1C1C3A',
-  },
-  sendButton: {
-    backgroundColor: '#007AFF',
-    padding: 10,
-    marginLeft: 5,
-    borderRadius: 20,
-  },
-  sendText: {
-    color: '#fff',
-    fontWeight: 'bold',
   },
   topHeader: {
     flexDirection: 'row',
@@ -288,6 +239,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  chatUsernameWrapper: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#1C1C3A',
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  chatUsernameText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  chatUsernameName: {
+    color: '#90EE90',
+    fontWeight: 'bold',
+  },
+  messagesList: {
+    flex: 1,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -366,21 +336,5 @@ const styles = StyleSheet.create({
   receivedText: {
     color: '#fff',
     fontSize: 16,
-  },
-  chatUsernameWrapper: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    backgroundColor: '#1C1C3A',
-    borderRadius: 10,
-    marginBottom: 12,
-  },
-  chatUsernameText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  chatUsernameName: {
-    color: '#90EE90',
-    fontWeight: 'bold',
   },
 });
