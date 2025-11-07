@@ -7,6 +7,7 @@ import Partners from './Partners';
 import Trade from './Trade';
 import Messages from './Messages';
 import Profile from './Profile';
+import Items from './Items';
 
 const Stack = createNativeStackNavigator();
 
@@ -20,6 +21,7 @@ export default function App() {
         <Stack.Screen name="TradesScreen" component={Trade} />
         <Stack.Screen name="MessagesScreen" component={Messages} />
         <Stack.Screen name="ProfileScreen" component={Profile} />
+        <Stack.Screen name="ItemsScreen" component={Items} />
       </Stack.Navigator>
     </NavigationContainer>
   );
